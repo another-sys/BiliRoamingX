@@ -214,7 +214,7 @@ def sign(config):
         "".join(f"{sha256(p)}  {p.name}\n" for p in sorted(DIST.iterdir()) if p.is_file()), encoding="utf-8")
     limitations = ", ".join(config["excluded_patches"])
     (WORK / "release-notes.md").write_text(
-        "**兼容性预览版：尚未恢复上游全部增强功能，未完成 ARM64 真机的视频播放与区域解析验证。**\n\n"
+        "**兼容性预览版。各项增强功能与真机验收结果见本 tag 的兼容性说明。**\n\n"
         f"哔哩哔哩 **{config['client']['version']}**，已集成哔哩漫游 X，Android 7.0+ / ARM64。\n\n"
         f"直接下载 **`{name}`** 安装，无需 Root、LSPosed 或另装模块。\n\n"
         "首次安装与官方包签名不同，需先备份数据并卸载官方版；本仓库后续版本使用固定签名，可覆盖升级。\n\n"

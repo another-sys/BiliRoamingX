@@ -19,8 +19,9 @@
 仓库已提供 [Build installable Bilibili APK](.github/workflows/release-apk.yml)。推送 `v*` tag 会从该提交构建模块与补丁、验证官方 APK、合并、签名，并创建带 APK 的 GitHub 预发布。
 
 ```sh
-git tag v1.24.0-bili9.17.0-rc.2
-git push origin v1.24.0-bili9.17.0-rc.2
+tag=v1.24.0-bili9.17.0-rc.4  # 示例，请换成尚未使用的新版本号
+git tag "$tag"
+git push origin "$tag"
 ```
 
 使用新 tag 发布，不要覆盖已有 tag。也可以在 Actions 中手动运行；手动构建只上传 Actions artifact，不创建 Release。
