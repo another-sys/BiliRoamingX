@@ -9,6 +9,7 @@ import app.revanced.patcher.util.proxy.mutableTypes.MutableMethodParameter.Compa
 import app.revanced.patches.bilibili.misc.settings.fingerprints.PreferenceManagerFingerprint
 import app.revanced.patches.bilibili.utils.MethodParameter
 import app.revanced.patches.bilibili.utils.cloneMutable
+import app.revanced.patches.bilibili.utils.removeFinal
 import app.revanced.util.exception
 
 /**
@@ -59,6 +60,14 @@ object FixPreferenceManagerPatch : BytecodePatch(setOf(PreferenceManagerFingerpr
 
         val getSharedPreferencesMethod = preferenceManagerDef.methods.first {
             it.parameters.isEmpty() && it.returnType == "Landroid/content/SharedPreferences;"
+        }
+        // R8 marks this getter final in 9.x; the module overrides it to use its
+        // own preferences. Merely renaming the override causes a LinkageError.
+        PreferenceManagerFingerprint.result!!.mutableClass.run {
+            accessFlags = accessFlags.removeFinal()
+            methods.first { it == getSharedPreferencesMethod }.run {
+                accessFlags = accessFlags.removeFinal()
+            }
         }
         val modulePrefsManagerClass =
             context.findClass("Lapp/revanced/bilibili/settings/ModulePreferenceManager;")!!.mutableClass
