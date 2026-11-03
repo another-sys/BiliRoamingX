@@ -27,6 +27,7 @@ import java.util.concurrent.TimeoutException
 
 object FeedIndex : ApiHook() {
     private const val MIN_VIDEOS = 10
+    private const val LOAD_MORE_ROWS = 3
     private const val MAX_EMPTY_PAGES = 3
     private const val RECENT_LIMIT = 200
     private const val REFILL_BUDGET_MS = 6000L
@@ -172,6 +173,14 @@ object FeedIndex : ApiHook() {
     private fun fillRefresh(uri: Uri, data: JSONObject, firstCursor: Long?) {
         if (!uri.isFeed()) return
         val items = data.optJSONArray("items") ?: return
+        val config = data.optJSONObject("config")
+        // Pegasus counts the remaining grid rows and issues its own paginated request.
+        // Negative distances and no_preload both disable loading ahead in 9.17.
+        val rowKey = "trigger_loadmore_left_line_num"
+        if (config != null && config.optInt("no_preload") == 0 &&
+            config.optInt(rowKey) in 0 until LOAD_MORE_ROWS) {
+            config.put(rowKey, LOAD_MORE_ROWS)
+        }
         val history = historyFor(Accounts.mid)
         val pull = uri.getQueryParameter("pull")
         val loadMore = uri.getQueryParameter("flush") == "8" ||
@@ -183,6 +192,7 @@ object FeedIndex : ApiHook() {
                 }
                 history.trimHistory()
             }
+            Logger.info { "Home load more: cards=${items.length()}" }
             return
         }
         val ids = HashSet<Long>()
