@@ -4,6 +4,7 @@ import androidx.annotation.Keep
 import app.revanced.bilibili.settings.BooleanSetting
 import app.revanced.bilibili.settings.Settings
 import app.revanced.bilibili.utils.Constants
+import app.revanced.bilibili.utils.Versions
 import app.revanced.bilibili.utils.avOrBvPattern
 
 object ConfigPatch {
@@ -15,7 +16,6 @@ object ConfigPatch {
         "player.volume.balance",                      // 音量均衡设置
         "ff_side_center_setting_entrance_visibility", // 首页头像入口设置
         "ff_united_video_setting",                    // 新版三点菜单
-        "ff_mod_opt_init_delay",                      // 延迟初始化模块
         "story_new_three_point",                      // 新版竖屏模式三点菜单
         "downloader.p2p_disabled",                    // 禁用P2P下载
     )
@@ -71,7 +71,7 @@ object ConfigPatch {
     @JvmStatic
     private val configHooks = indexByKey(
         Hook(Constants.MAX_QN.toString(), "ijkplayer.autoswitch_max_qn"),
-        Hook("5000", "modmanager.mod_opt_init_delay_time"), // 延迟5s初始化模块
+        Hook<String>({ !Versions.ge9_17_0() }, "5000", "modmanager.mod_opt_init_delay_time"),
         Hook("1;600", "modmanager.mod_api_retry_config"), // 重试1次，间隔600ms
         ConfigHook(Settings.EnableAv, "0", "bv.enable_bv"),
         ConfigHook(Settings.EnableAv, avOrBvPattern, "bv.pattern_rule_av_only"),
@@ -82,6 +82,8 @@ object ConfigPatch {
     @JvmStatic
     fun getAb(key: String, defValue: Boolean?, origin: Boolean?): Boolean? {
         //Logger.debug { "ConfigPatch, ab of $key: $origin, default: $defValue" }
+        // The first player on 9.17 can request its danmaku package during cold start.
+        if (key == "ff_mod_opt_init_delay") return !Versions.ge9_17_0()
         val abHook = abHooks[key]
         if (abHook != null && abHook.enabled())
             return abHook.value
