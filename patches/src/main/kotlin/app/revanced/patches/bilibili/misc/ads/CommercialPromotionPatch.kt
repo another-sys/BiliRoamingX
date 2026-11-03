@@ -8,8 +8,8 @@ import app.revanced.patcher.patch.annotation.CompatiblePackage
 import app.revanced.patcher.patch.annotation.Patch
 import app.revanced.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
 import app.revanced.patches.bilibili.utils.*
-import app.revanced.util.getReference
 import com.android.tools.smali.dexlib2.AccessFlags
+import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 
 @Patch(
@@ -114,7 +114,9 @@ object CommercialPromotionPatch : BytecodePatch() {
         val mine = "Ltv/danmaku/bili/ui/main2/mine/HomeUserCenterFragment;".toClassDef(context).proxy(context)
         val bind = mine.methods.single { it.name == "Wf" && it.parameterTypes.lastOrNull()?.endsWith("/AccountMine;") == true }
         val anchor = bind.implementation!!.instructions.indexOfFirst {
-            it.getReference<MethodReference>()?.let { ref -> ref.definingClass == mine.type && ref.name == "ig" } == true
+            ((it as? ReferenceInstruction)?.reference as? MethodReference)?.let { ref ->
+                ref.definingClass == mine.type && ref.name == "ig"
+            } == true
         }
         check(anchor > 0)
         bind.addInstructions(anchor + 1, "invoke-static {v3}, $filter->filterMine(Ljava/util/List;)Ljava/util/List;\nmove-result-object v3")
