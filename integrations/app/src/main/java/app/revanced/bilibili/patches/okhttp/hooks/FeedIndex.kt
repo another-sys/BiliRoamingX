@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
 object FeedIndex : ApiHook() {
-    private const val MIN_VIDEOS = 10
+    internal const val MIN_VIDEOS = 10
     private const val LOAD_MORE_ROWS = 8
     private const val MAX_EMPTY_PAGES = 3
     private const val RECENT_LIMIT = 200
@@ -74,20 +74,21 @@ object FeedIndex : ApiHook() {
         return Pair.create(url, headers)
     }
 
-    private fun Uri.isFeed() = scheme == "https" && host in feedHosts && path == "/x/v2/feed/index"
+    internal fun Uri.isFeed() = scheme == "https" && host in feedHosts && path == "/x/v2/feed/index"
 
-    private fun Uri.isLoadMore(): Boolean {
+    internal fun Uri.isLoadMore(): Boolean {
         val pull = getQueryParameter("pull")
         return getQueryParameter("flush") == "8" ||
                 ((pull == "false" || pull == "0") && getQueryParameter("idx")?.toLongOrNull() != 0L)
     }
 
-    private fun Uri.queryMap() = queryParameterNames.associateWith { getQueryParameter(it).orEmpty() }
+    internal fun Uri.queryMap() = queryParameterNames.associateWith { getQueryParameter(it).orEmpty() }
 
     @Synchronized
     private fun prefetch(url: String, uri: Uri, idx: Long, account: Long) {
         if (account != recentAccount) return
         val cursor = if (uri.isLoadMore()) {
+            if (FeedWindow.enabled) return // The rolling window owns scrolling speculation.
             if (scrollPageSpan !in 1 until idx) return
             idx - scrollPageSpan
         } else {
@@ -127,6 +128,7 @@ object FeedIndex : ApiHook() {
 
     override fun hook(url: String, status: Int, request: String, response: String): String {
         return try {
+            val ticket = FeedWindow.finishRequest()
             val resp = response.toJSONObject()
             if (resp.optInt("code", -1) != 0) return response
             val data = resp.optJSONObject("data") ?: return response
@@ -134,7 +136,7 @@ object FeedIndex : ApiHook() {
             PegasusPatch.pegasusHook(data)
             if (Versions.ge9_17_0()) {
                 try {
-                    fillPage(Uri.parse(url), data, cursor)
+                    fillPage(Uri.parse(url), data, cursor, ticket)
                 } catch (e: Exception) {
                     Logger.warn { "Feed refill stopped (${e.javaClass.simpleName})" }
                 } catch (e: LinkageError) {
@@ -151,7 +153,7 @@ object FeedIndex : ApiHook() {
         }
     }
 
-    private fun JSONArray.lastCursor(): Long? {
+    internal fun JSONArray.lastCursor(): Long? {
         for (i in length() - 1 downTo 0) {
             val idx = optJSONObject(i)?.optLong("idx") ?: continue
             if (idx > 0) return idx
@@ -159,7 +161,7 @@ object FeedIndex : ApiHook() {
         return null
     }
 
-    private fun videoId(card: JSONObject): Long? {
+    internal fun videoId(card: JSONObject): Long? {
         if (card.optString("goto") != "av" && card.optString("card_goto") != "av") return null
         val playerAid = card.optJSONObject("player_args")?.optLong("aid") ?: 0L
         if (playerAid > 0) return playerAid
@@ -170,7 +172,7 @@ object FeedIndex : ApiHook() {
     }
 
     @Synchronized
-    private fun historyFor(account: Long): LinkedHashSet<Long> {
+    internal fun historyFor(account: Long): LinkedHashSet<Long> {
         if (account != recentAccount) {
             // An in-flight request for the old account keeps its own history.
             recent = LinkedHashSet()
@@ -191,9 +193,7 @@ object FeedIndex : ApiHook() {
         }
     }
 
-    private fun fillPage(uri: Uri, data: JSONObject, firstCursor: Long?) {
-        if (!uri.isFeed()) return
-        val items = data.optJSONArray("items") ?: return
+    internal fun preloadAllowed(data: JSONObject): Boolean {
         val config = data.optJSONObject("config")
         // Pegasus counts the remaining grid rows and issues its own paginated request.
         // Negative distances and no_preload both disable loading ahead in 9.17.
@@ -202,8 +202,20 @@ object FeedIndex : ApiHook() {
             config.optInt(rowKey) in 0 until LOAD_MORE_ROWS) {
             config.put(rowKey, LOAD_MORE_ROWS)
         }
-        val history = historyFor(Accounts.mid)
+        return config?.optInt("no_preload") != 1 && (config?.optInt(rowKey) ?: 0) >= 0
+    }
+
+    private fun fillPage(uri: Uri, data: JSONObject, firstCursor: Long?, ticket: FeedWindow.Ticket?) {
+        if (!uri.isFeed()) return
+        val items = data.optJSONArray("items") ?: return
+        val preload = preloadAllowed(data)
+        if (ticket != null && ticket.account != Accounts.mid) return
+        val history = ticket?.history ?: historyFor(Accounts.mid)
+        var tail = firstCursor
+        var span = 0L
         val loadMore = uri.isLoadMore()
+        val idx = uri.getQueryParameter("idx")?.toLongOrNull() ?: 0L
+        if (loadMore && firstCursor != null && firstCursor in 1 until idx) span = idx - firstCursor
         // Keep the full scrolling session, then carry the most recent IDs into the next refresh.
         if (!loadMore) synchronized(history) { history.trimHistory() }
         val ids = HashSet<Long>()
@@ -256,6 +268,8 @@ object FeedIndex : ApiHook() {
                     } ?: break
                     val raw = next.optJSONArray("items") ?: break
                     cursor = raw.lastCursor()
+                    tail = cursor
+                    if (cursor != null && cursor in 1 until pageStart) span = pageStart - cursor
                     PegasusPatch.pegasusHook(next)
                     collect(raw, original = false)
                     // A refresh refill is itself a load-more response and can prime the first scroll.
@@ -273,18 +287,25 @@ object FeedIndex : ApiHook() {
                     deadline = SystemClock.elapsedRealtime() + REFILL_BUDGET_MS
             }
         }
+        if (ticket != null && preload && tail != null && merged.length() > 0) {
+            val head = if (loadMore) idx else merged.optJSONObject(0)?.optLong("idx") ?: 0L
+            FeedWindow.prime(ticket, uri, head, merged.lastCursor(), tail, span)
+        }
         Logger.info {
             val action = if (loadMore) "load more" else "refresh"
             "Home $action: initial=$initial extraPages=$pages uniqueVideos=${ids.size} prefetched=$usedPrefetch"
         }
     }
 
-    private fun nextPage(uri: Uri, query: Map<String, String>, cursor: Long, timeout: Int): JSONObject? {
+    private fun nextPage(uri: Uri, query: Map<String, String>, cursor: Long, timeout: Int) =
+        nextEnvelope(uri, query, cursor, timeout)?.optJSONObject("data")
+
+    internal fun nextEnvelope(uri: Uri, query: Map<String, String>, cursor: Long, timeout: Int): JSONObject? {
         // 9.17 uses pull=false, flush=8 and the last raw card's idx to load more.
         val paging = mapOf("idx" to cursor.toString(), "pull" to "false", "flush" to "8")
         val url = uri.buildUpon().encodedQuery(signQuery(query, paging)).build().toString()
         // Platform HTTP bypasses the hooked app OkHttp pipeline.
         val resp = HttpClient.get(url, timeout = timeout)?.json() ?: return null
-        return if (resp.optInt("code", -1) == 0) resp.optJSONObject("data") else null
+        return resp.takeIf { it.optInt("code", -1) == 0 }
     }
 }

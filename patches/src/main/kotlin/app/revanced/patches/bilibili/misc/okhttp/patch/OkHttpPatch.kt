@@ -10,6 +10,11 @@ import app.revanced.patches.bilibili.misc.okhttp.fingerprints.*
 import app.revanced.patches.bilibili.patcher.patch.MultiMethodBytecodePatch
 import app.revanced.patches.bilibili.utils.*
 import app.revanced.util.exception
+import app.revanced.patcher.extensions.InstructionExtensions.replaceInstruction
+import app.revanced.util.getReference
+import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 import com.android.tools.smali.dexlib2.AccessFlags
 
 @Patch(
@@ -386,6 +391,23 @@ object OkHttpPatch : MultiMethodBytecodePatch(
             """.trimIndent()
             )
         }.also { realCallClass.methods.add(it) }
+        // Replace only the outer chain dispatch. RealCall still owns cancellation and completion.
+        if (context.findClass("Lcom/bilibili/bilifeed/card/FeedItem;") != null) {
+            val chain = "Lokhttp3/Interceptor\$Chain;"
+            realCallGetMethod.implementation!!.instructions.withIndex().singleOrNull { (_, inst) ->
+                if (inst.opcode != Opcode.INVOKE_VIRTUAL || inst !is FiveRegisterInstruction) false
+                else inst.getReference<MethodReference>().let { m ->
+                    m.name == "proceed" && m.returnType == responseClass.type &&
+                            m.parameterTypes == listOf(requestClass.type) &&
+                            chain in context.findClass(m.definingClass)?.immutableClass?.interfaces.orEmpty()
+                }
+            }?.let { (index, inst) ->
+                val args = (inst as FiveRegisterInstruction).args()
+                realCallGetMethod.replaceInstruction(index, "invoke-static {$args}, " +
+                        "Lapp/revanced/bilibili/patches/okhttp/FeedCacheBridge;->proceed(" +
+                        "${chain}Lokhttp3/Request;)Lokhttp3/Response;")
+            }
+        }
         realCallGetMethod.cloneMutable(registerCount = 2, clearImplementation = true).apply {
             realCallGetMethod.name += "_Origin"
             addInstructions(
