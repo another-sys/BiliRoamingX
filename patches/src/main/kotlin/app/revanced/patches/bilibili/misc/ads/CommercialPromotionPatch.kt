@@ -163,6 +163,33 @@ object CommercialPromotionPatch : BytecodePatch() {
         check(anchor > 0)
         bind.addInstructions(anchor + 1, "invoke-static {v3}, $filter->filterMine(Ljava/util/List;)Ljava/util/List;\nmove-result-object v3")
 
+        // Mine V2 also renders cached creator/service shortcuts from this separate model.
+        val menuV2 = "Lcom/bilibili/lib/homepage/mine/MenuGroupV2;"
+        val itemV2 = "Lcom/bilibili/lib/homepage/mine/MenuGroupV2\$Item;".toClassDef(context).proxy(context)
+        for (getter in listOf("getTitle", "getUri")) {
+            check(itemV2.methods.any { it.name == getter && it.parameterTypes.isEmpty() && it.returnType == "Ljava/lang/String;" })
+        }
+        itemV2.interfaces.add("Lapp/revanced/bilibili/patches/PromotionEntry;")
+        itemV2.methods.add(Method(itemV2.type, "brxHideEntry", "Z", AccessFlags.PUBLIC.value,
+            implementation = MethodImplementation(registerCount = 3)).toMutable().apply {
+            addInstructions("""
+                invoke-virtual {p0}, ${itemV2.type}->getTitle()Ljava/lang/String;
+                move-result-object v0
+                invoke-virtual {p0}, ${itemV2.type}->getUri()Ljava/lang/String;
+                move-result-object v1
+                invoke-static {v0, v1}, $filter->hidden(Ljava/lang/String;Ljava/lang/String;)Z
+                move-result v0
+                return v0
+            """.trimIndent())
+        })
+        val itemList = menuV2.toClassDef(context).proxy(context).methods.single {
+            it.name == "getItemList" && it.parameterTypes.isEmpty() && it.returnType == "Ljava/util/List;"
+        }
+        val ops = itemList.implementation!!.instructions
+        val returnIndex = ops.indices.single { ops[it].opcode == Opcode.RETURN_OBJECT }
+        val listReg = (ops[returnIndex] as OneRegisterInstruction).registerA
+        itemList.addInstructions(returnIndex, "invoke-static/range {v$listReg .. v$listReg}, $filter->filterEntries(Ljava/util/List;)Ljava/util/List;\nmove-result-object v$listReg")
+
         // Mine V2 creates a local fallback subscription banner even without a server payload.
         // Return before the composable opens any groups, starts effects, or adds a layout node.
         val vip = "Ltv/danmaku/bili/ui/main2/mineV2/ui/MineVipModuleComposeKt;".toClassDef(context).proxy(context)

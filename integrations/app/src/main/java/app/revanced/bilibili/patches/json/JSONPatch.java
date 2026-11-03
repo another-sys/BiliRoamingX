@@ -124,12 +124,21 @@ public class JSONPatch {
                     ads.clear();
             }
         } else if (modelPresent("com.bilibili.bililive.room.biz.shopping.beans.LiveShoppingInfo") && data instanceof LiveShoppingInfo info) {
-            if (Settings.PurifyLivePopups.get().contains("shoppingCard")) {
+            var keys = Settings.PurifyLivePopups.get();
+            if (keys.contains("shoppingCard")) {
                 info.shoppingCardDetail = null;
-                info.recommendCardDetail = null;
+                if (Versions.atLeast("9.17.0")) {
+                    info.bubblesDetail = null;
+                    info.h5JumpWindowInfoList = null;
+                }
             }
-        } else if (modelPresent("com.bilibili.bililive.room.biz.shopping.beans.LiveGoodsCardInfo") && data instanceof LiveGoodsCardInfo || modelPresent("com.bilibili.bililive.room.biz.shopping.beans.LiveShoppingRecommendCardGoodsDetail") && data instanceof LiveShoppingRecommendCardGoodsDetail) {
+            if (keys.contains("shoppingSelected"))
+                info.recommendCardDetail = null;
+        } else if (modelPresent("com.bilibili.bililive.room.biz.shopping.beans.LiveGoodsCardInfo") && data instanceof LiveGoodsCardInfo) {
             if (Settings.PurifyLivePopups.get().contains("shoppingCard"))
+                return null;
+        } else if (modelPresent("com.bilibili.bililive.room.biz.shopping.beans.LiveShoppingRecommendCardGoodsDetail") && data instanceof LiveShoppingRecommendCardGoodsDetail) {
+            if (Settings.PurifyLivePopups.get().contains("shoppingSelected"))
                 return null;
         } else if (modelPresent("com.bilibili.bililive.videoliveplayer.net.beans.gateway.roominfo.BiliLiveRoomInfo") && data instanceof BiliLiveRoomInfo roomInfo) {
             Set<? extends String> keys = Settings.PurifyLivePopups.get();

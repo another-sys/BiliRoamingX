@@ -57,10 +57,7 @@ object SearchAll : MossHook<SearchAllRequest, SearchAllResponse>() {
             types.add("bgm_media")
             types.add("pgc_media")
         }
-        if (types.contains("ad")) {
-            types.add("product")
-            types.add("special_s")
-        }
+        val blockAds = types.remove("ad")
         val toRemoveIndexes = mutableListOf<Int>()
         val contents = Settings.FilterSearchContent()
         val contentRegexMode = Settings.FilterSearchContentRegexMode()
@@ -69,13 +66,13 @@ object SearchAll : MossHook<SearchAllRequest, SearchAllResponse>() {
         val upRegexMode = Settings.FilterSearchUpRegexMode()
         val upRegexes = upRegexes(ups, upRegexMode)
         val uids = ArrayUtils.toLongArray(Settings.FilterSearchUid())
-        if (types.isEmpty() && contents.isEmpty() && ups.isEmpty() && uids.isEmpty())
+        if (!blockAds && types.isEmpty() && contents.isEmpty() && ups.isEmpty() && uids.isEmpty())
             return
         fun String.removeEm() = replace("<em class=\"keyword\">", "")
             .replace("</em>", "")
         for ((index, item) in reply.itemList.withIndex()) {
             val linkType = item.linktype
-            if (types.isNotEmpty() && types.any { linkType.contains(it) }) {
+            if (blockAds && item.isSearchPromotion() || types.any { linkType.contains(it) }) {
                 toRemoveIndexes.add(index)
                 continue
             }

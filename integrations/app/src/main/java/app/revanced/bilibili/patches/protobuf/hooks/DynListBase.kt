@@ -6,6 +6,7 @@ import app.revanced.bilibili.utils.ArrayUtils
 import com.bapis.bilibili.ad.v1.SourceContentDto
 import com.bapis.bilibili.app.dynamic.v2.*
 import com.google.protobuf.GeneratedMessageLite
+import com.google.protobuf.InvalidProtocolBufferException
 
 abstract class DynListBase<out Req : GeneratedMessageLite<*, *>, out Resp : GeneratedMessageLite<*, *>> :
     MossHook<Req, Resp>() {
@@ -48,16 +49,20 @@ abstract class DynListBase<out Req : GeneratedMessageLite<*, *>, out Resp : Gene
                 idxList.add(idx)
                 continue
             }
-            if (rmAdLink && (extend.origDescList.any { it.type == DescType.desc_type_goods }
-                        || extend.descList.any { it.type == DescType.desc_type_goods })) {
+            if (rmCm && item.withForward().any { it.isPromotedCard() }) {
                 idxList.add(idx)
                 continue
             }
             if ((rmAdLink || rmUpReservation) && item.withForward().any { i ->
-                    i.modulesList.find { it.hasModuleAdditional() }?.moduleAdditional?.type?.let { type ->
-                        rmAdLink && (type == AdditionalType.additional_type_goods || type == AdditionalType.additional_type_up_rcmd)
-                                || rmUpReservation && type == AdditionalType.additional_type_up_reservation
-                    } == true
+                    (rmAdLink && (i.extend.origDescList.any { it.type == DescType.desc_type_goods }
+                            || i.extend.descList.any { it.type == DescType.desc_type_goods }))
+                            || i.modulesList.any { module ->
+                        module.hasModuleAdditional() && when (module.moduleAdditional.type) {
+                            AdditionalType.additional_type_goods, AdditionalType.additional_type_up_rcmd -> rmAdLink
+                            AdditionalType.additional_type_up_reservation -> rmUpReservation
+                            else -> false
+                        }
+                    }
                 }) {
                 idxList.add(idx)
                 continue
@@ -66,13 +71,6 @@ abstract class DynListBase<out Req : GeneratedMessageLite<*, *>, out Resp : Gene
                     i.modulesList.find { it.hasModuleDynamic() }?.moduleDynamic?.dynArchive
                         ?.stype == VideoType.video_type_story
                 }) {
-                idxList.add(idx)
-                continue
-            }
-            if (rmCm && extend.hasSourceContent()
-                && extend.sourceContent.typeUrl == "type.googleapis.com/bilibili.ad.v1.SourceContentDto"
-                && SourceContentDto.parseFrom(extend.sourceContent.value).isAdLoc
-            ) {
                 idxList.add(idx)
                 continue
             }
@@ -120,6 +118,18 @@ abstract class DynListBase<out Req : GeneratedMessageLite<*, *>, out Resp : Gene
             }
         }
         return idxList
+    }
+
+    private fun DynamicItem.isPromotedCard(): Boolean {
+        if (cardType == DynamicType.ad) return true
+        if (!extend.hasSourceContent()) return false
+        val source = extend.sourceContent
+        if (source.typeUrl.substringAfterLast('/') != "bilibili.ad.v1.SourceContentDto") return false
+        return try {
+            SourceContentDto.parseFrom(source.value).isAdLoc
+        } catch (_: InvalidProtocolBufferException) {
+            false
+        }
     }
 
     private fun DynamicItem.withForward(): Array<DynamicItem> {

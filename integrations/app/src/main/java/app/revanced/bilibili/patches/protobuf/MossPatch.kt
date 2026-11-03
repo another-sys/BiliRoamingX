@@ -45,6 +45,7 @@ object MossPatch {
         ResourceTopActivity,
         SearchAll,
         SearchByType,
+        SearchByTypeAds,
         SearchDefaultWords,
         View,
         ViewContinuousPlay,

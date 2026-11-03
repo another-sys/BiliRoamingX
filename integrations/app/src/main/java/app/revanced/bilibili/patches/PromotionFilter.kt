@@ -22,14 +22,15 @@ object PromotionFilter {
         if (Settings.BlockTopActivity() && (route.startsWith("https://www.bilibili.com/blackboard/tab/")
                     || (route.startsWith("bilibili://following/home_activity_tab/")
                         && route.substringAfterLast('/') !in regionalTabs))) return true
-        return Settings.HideCommercialEntries() && (name in shopNames
+        return Settings.HideCommercialEntries() && (name in commercialNames
                     || route.startsWith("bilibili://mall/")
                     || route.startsWith("bilibili://workshop/")
                     || route.startsWith("https://mall.bilibili.com/")
                     || route.startsWith("https://shop.bilibili.com/"))
     }
 
-    private val shopNames = setOf("会员购", "会员购中心", "会员购订单", "商城", "必火推广", "工房", "我的工房", "装扮中心", "个性装扮")
+    private val commercialNames = setOf("会员购", "会员购中心", "会员购订单", "商城", "必火推广", "工房", "我的工房",
+        "装扮中心", "个性装扮", "有奖活动", "开播福利")
     private val regionalTabs = setOf("6544", "168644", "163541", "95636")
 
     private val promotedMentionTypes = setOf(

@@ -1126,6 +1126,7 @@ public class PegasusPatch {
     }
 
     public static List<Integer> getToRemovePopularIndexes(List<Card> cards) {
+        boolean blockAds = Settings.FilterHomeRecommend.get().contains("advertisement");
         boolean blockTopEntrance = Settings.BlockPopularTopEntrance.get();
         boolean blockTopicList = Settings.BlockPopularTopicList.get();
         boolean blockRcmdUp = Settings.BlockPopularRcmdUp.get();
@@ -1175,6 +1176,10 @@ public class PegasusPatch {
         List<Integer> idxList = new ArrayList<>();
         for (int i = 0; i < cards.size(); i++) {
             Card card = cards.get(i);
+            if (blockAds && card.hasSmallCoverV5Ad()) {
+                idxList.add(i);
+                continue;
+            }
             if (blockTopEntrance && card.hasPopularTopEntrance()) {
                 idxList.add(i);
                 continue;
