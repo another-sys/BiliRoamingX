@@ -120,5 +120,18 @@ object CommercialPromotionPatch : BytecodePatch() {
         }
         check(anchor > 0)
         bind.addInstructions(anchor + 1, "invoke-static {v3}, $filter->filterMine(Ljava/util/List;)Ljava/util/List;\nmove-result-object v3")
+
+        // Mine V2 creates a local fallback subscription banner even without a server payload.
+        // Return before the composable opens any groups, starts effects, or adds a layout node.
+        val vip = "Ltv/danmaku/bili/ui/main2/mineV2/ui/MineVipModuleComposeKt;".toClassDef(context).proxy(context)
+        vip.methods.single { it.name == "b" && it.parameterTypes.firstOrNull() == "Landroidx/compose/ui/Modifier;" }
+            .addInstructionsWithLabels(0, """
+                invoke-static {}, $filter->hideVipBanner()Z
+                move-result v0
+                if-eqz v0, :original
+                return-void
+                :original
+                nop
+            """.trimIndent())
     }
 }

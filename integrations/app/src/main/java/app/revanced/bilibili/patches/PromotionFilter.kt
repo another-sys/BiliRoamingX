@@ -12,6 +12,7 @@ interface PromotionEntry {
 
 object PromotionFilter {
     @Keep @JvmStatic fun blockSplash() = Settings.PurifySplash()
+    @Keep @JvmStatic fun hideVipBanner() = Settings.RemoveVipSection()
 
     @Keep @JvmStatic fun hidden(name: String?, uri: String?): Boolean {
         val route = uri.orEmpty().substringBefore('?').substringBefore('#')
