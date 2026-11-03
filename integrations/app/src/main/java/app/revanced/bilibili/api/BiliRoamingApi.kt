@@ -61,13 +61,16 @@ object BiliRoamingApi {
 
         val hostList = LinkedHashMap<Area, String>(4, 1f, true)
 
-        // reversely
-        mapOf(
+        // Keep the configured server priority. Without a server, no region lookup is needed.
+        val servers = mapOf(
             Area.TaiWan to twUrl,
             Area.HongKong to hkUrl,
             Area.Thailand to thUrl,
             Area.China to cnUrl
-        ).filter { (k, v) -> k != area && v.isNotEmpty() }.let { hostList.putAll(it) }
+        )
+        if (servers.values.all { it.isEmpty() }) return null
+        val currentArea = area
+        servers.filterTo(hostList) { (k, v) -> k != currentArea && v.isNotEmpty() }
         if (hostList.isEmpty()) return null
 
         val epId = query["ep_id"] ?: return null

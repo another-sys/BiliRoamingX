@@ -152,12 +152,6 @@ object OkHttpPatch : MultiMethodBytecodePatch(
             
                 move-result-object v10
             
-                invoke-static {v10, v9}, Lapp/revanced/bilibili/patches/okhttp/OkHttpPatch;->shouldHook(Ljava/lang/String;I)Z
-            
-                move-result v3
-            
-                if-eqz v3, :cond_ab
-            
                 const-string v3, "Content-Type"
             
                 invoke-virtual {v0, v3}, $responseHeaderMethod
@@ -191,6 +185,10 @@ object OkHttpPatch : MultiMethodBytecodePatch(
                 if-eqz v5, :cond_ab
             
                 :cond_2f
+                invoke-static {v10, v9}, Lapp/revanced/bilibili/patches/okhttp/OkHttpPatch;->shouldHook(Ljava/lang/String;I)Z
+                move-result v5
+                if-eqz v5, :cond_ab
+
                 iget-object v12, v2, $requestBodyField
             
                 invoke-virtual {v2, v3}, $requestHeaderMethod

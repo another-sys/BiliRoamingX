@@ -6,7 +6,6 @@ import com.bapis.bilibili.app.playurl.v1.CodeType
 import com.bapis.bilibili.app.playurl.v1.PlayURLMoss
 import com.bapis.bilibili.app.playurl.v1.PlayViewReq
 import java.util.concurrent.Future
-import java.util.concurrent.TimeUnit
 
 object UposReplacer {
 
@@ -16,29 +15,28 @@ object UposReplacer {
     private val aliovHost = Utils.getString("biliroaming_aliov_host")
     private val hkBcacheHost = Utils.getString("biliroaming_hk_bcache_host")
 
-    private val isLocatedInCn by lazy { area.let { it == null || it == Area.China } }
-
     val uposBase: String
         get() = Settings.UposHost().ifEmpty {
-            if (isLocatedInCn) hwHost else aliovHost
+            val currentArea = if (areaTask.isDone) area else null
+            if (currentArea == null || currentArea == Area.China) hwHost else aliovHost
         }
 
-    val uposBackups: List<String>
-        get() = runCatchingOrNull {
-            baseUposList.get(1L, TimeUnit.SECONDS)
-                ?.filterNot { it == uposBase }?.subList(0, 2)
-        } ?: extraUposList
-
-    val replaceUpos inline get() = uposBase != Constants.NON_UPOS_VALUE
-
-    private val uposList = Utils.getStringArray("biliroaming_upos_values")
-    private val extraUposList: List<String>
-        get() = when (uposList.indexOf(uposBase)) {
+    fun backupsFor(primary: String): List<String> {
+        val probe = baseUposList
+        if (probe.isDone) {
+            val discovered = runCatchingOrNull { probe.get() }.orEmpty()
+                .asSequence().filter { it != primary }.take(2).toList()
+            if (discovered.size == 2) return discovered
+        }
+        return when (uposList.indexOf(primary)) {
             in 1..4/* ali */ -> listOf(hwHost, cosHost)
             in 5..7/* cos */ -> listOf(hwHost, aliHost)
             in 8..15/* hw */ -> listOf(aliHost, cosHost)
             else/* oversea */ -> listOf(aliHost, hkBcacheHost)
         }
+    }
+
+    private val uposList = Utils.getStringArray("biliroaming_upos_values")
 
     private val ipPCdnRegex by lazy { Regex("""^https?://\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}""") }
     private val bCacheRegex by lazy { Regex("""^https?://cn-.*\.bilivideo""") }

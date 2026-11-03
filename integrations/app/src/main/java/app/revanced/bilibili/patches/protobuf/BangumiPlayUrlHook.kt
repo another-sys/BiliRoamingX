@@ -13,7 +13,6 @@ import app.revanced.bilibili.settings.Settings
 import app.revanced.bilibili.utils.*
 import app.revanced.bilibili.utils.UposReplacer.isPCdnUpos
 import app.revanced.bilibili.utils.UposReplacer.replaceUpos
-import app.revanced.bilibili.utils.UposReplacer.uposBackups
 import com.bapis.bilibili.app.archive.middleware.v1.PlayerArgs
 import com.bapis.bilibili.app.playerunite.v1.PlayViewUniteReply
 import com.bapis.bilibili.app.playerunite.v1.PlayViewUniteReq
@@ -1212,41 +1211,31 @@ object BangumiPlayUrlHook {
     }
 
     private fun VideoInfo.replaceUpos() {
-        if (!replaceUpos) return
-        streamListList.forEach { it.dashVideo.replaceDashVideoUpos() }
-        dashAudioList.forEach { it.replaceDashItemUpos() }
-    }
-
-    private fun DashVideo.replaceDashVideoUpos() {
-        if (baseUrl.isEmpty()) return
-        val (newBaseUrl, newBackupUrls) = replaceUpos(baseUrl, backupUrlList)
-        baseUrl = newBaseUrl
-        clearBackupUrl()
-        addAllBackupUrl(newBackupUrls)
-    }
-
-    private fun DashItem.replaceDashItemUpos() {
-        if (baseUrl.isEmpty()) return
-        val (newBaseUrl, newBackupUrls) = replaceUpos(baseUrl, backupUrlList)
-        baseUrl = newBaseUrl
-        clearBackupUrl()
-        addAllBackupUrl(newBackupUrls)
-    }
-
-    private fun replaceUpos(
-        baseUrl: String, backupUrls: List<String>
-    ): Pair<String, List<String>> {
-        val rawUrl = backupUrls.firstOrNull { !it.isPCdnUpos() }
-        return if (baseUrl.isPCdnUpos()) {
-            if (rawUrl != null) {
-                rawUrl.replaceUpos() to listOf(rawUrl.replaceUpos(uposBackups[0]), baseUrl)
-            } else baseUrl to backupUrls
-        } else {
-            val url = rawUrl ?: baseUrl
-            baseUrl.replaceUpos() to listOf(
-                url.replaceUpos(uposBackups[0]),
-                url.replaceUpos(uposBackups[1])
-            )
+        val primary = UposReplacer.uposBase
+        if (primary == Constants.NON_UPOS_VALUE) return
+        val backups by lazy(LazyThreadSafetyMode.NONE) { UposReplacer.backupsFor(primary) }
+        fun urls(base: String, alternatives: List<String>): Pair<String, List<String>>? {
+            if (base.isEmpty()) return null
+            val raw = alternatives.firstOrNull { !it.isPCdnUpos() }
+            if (base.isPCdnUpos()) {
+                if (raw == null) return null
+                return raw.replaceUpos(primary) to listOf(raw.replaceUpos(backups[0]), base)
+            }
+            val url = raw ?: base
+            return base.replaceUpos(primary) to listOf(url.replaceUpos(backups[0]), url.replaceUpos(backups[1]))
+        }
+        streamListList.forEach { stream ->
+            val video = stream.dashVideo
+            val (base, alternatives) = urls(video.baseUrl, video.backupUrlList) ?: return@forEach
+            video.baseUrl = base
+            video.clearBackupUrl()
+            video.addAllBackupUrl(alternatives)
+        }
+        dashAudioList.forEach { audio ->
+            val (base, alternatives) = urls(audio.baseUrl, audio.backupUrlList) ?: return@forEach
+            audio.baseUrl = base
+            audio.clearBackupUrl()
+            audio.addAllBackupUrl(alternatives)
         }
     }
 }
