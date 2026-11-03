@@ -509,8 +509,8 @@ object BangumiPlayUrlHook {
                 ConfType.LISTEN.number
             )) arcConfs[key] = supportedConf
         }
-        if (!isDownloadUnite && !Accounts.isEffectiveVip
-            && Settings.TrialVipQuality()
+        if (!isDownloadUnite && Settings.TrialVipQuality()
+            && !Accounts.isEffectiveVip
         ) TrialQualityPatch.makeVipFree(playReply)
         if (Settings.RemoveVideoPopups().contains("other")) {
             playReply.viewInfo.toastsList.withIndex().filter { (_, toast) ->

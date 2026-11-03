@@ -88,6 +88,8 @@ public class VideoQualityPatch {
 
     @Keep
     public static int getMatchedFullScreenQuality() {
-        return KtUtils.isWifiConnected() ? fullScreenQuality() : mobileFullScreenQuality();
+        String wifi = Settings.FullScreenQuality.get();
+        String mobile = Settings.MobileFullScreenQuality.get();
+        return Integer.parseInt(wifi.equals(mobile) || KtUtils.isWifiConnected() ? wifi : mobile);
     }
 }

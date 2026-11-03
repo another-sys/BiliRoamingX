@@ -50,8 +50,12 @@ object ConfigPatch {
     private class ConfigHook(setting: BooleanSetting, value: String, vararg keys: String) :
         Hook<String>({ setting() }, value, *keys)
 
+    private fun <T> indexByKey(vararg hooks: Hook<T>): Map<String, Hook<T>> = buildMap {
+        for (hook in hooks) for (key in hook.keys) put(key, hook)
+    }
+
     @JvmStatic
-    private val abHooks = listOf(
+    private val abHooks = indexByKey(
         Hook(false, *alwaysDisabledAbKeys),
         Hook(true, *alwaysEnabledAbKeys),
         AbHook(Settings.DisallowCollectPrivacyInfo, false, *privacyInfoKeys),
@@ -65,7 +69,7 @@ object ConfigPatch {
     )
 
     @JvmStatic
-    private val configHooks = listOf(
+    private val configHooks = indexByKey(
         Hook(Constants.MAX_QN.toString(), "ijkplayer.autoswitch_max_qn"),
         Hook("5000", "modmanager.mod_opt_init_delay_time"), // 延迟5s初始化模块
         Hook("1;600", "modmanager.mod_api_retry_config"), // 重试1次，间隔600ms
@@ -78,7 +82,7 @@ object ConfigPatch {
     @JvmStatic
     fun getAb(key: String, defValue: Boolean?, origin: Boolean?): Boolean? {
         //Logger.debug { "ConfigPatch, ab of $key: $origin, default: $defValue" }
-        val abHook = abHooks.find { it.keys.contains(key) }
+        val abHook = abHooks[key]
         if (abHook != null && abHook.enabled())
             return abHook.value
         if ("ff_unite_detail2" == key || "ff_unite_player" == key /*<7.39.0*/) {
@@ -96,7 +100,7 @@ object ConfigPatch {
     @JvmStatic
     fun getConfig(key: String, defValue: String?, origin: String?): String? {
         //Logger.debug { "ConfigPatch, config of $key: $origin, default: $defValue" }
-        val configHook = configHooks.find { it.keys.contains(key) }
+        val configHook = configHooks[key]
         if (configHook != null && configHook.enabled())
             return configHook.value
         if ("player.unite_login_qn" == key || "player.unite_unlogin_qn" == key) {

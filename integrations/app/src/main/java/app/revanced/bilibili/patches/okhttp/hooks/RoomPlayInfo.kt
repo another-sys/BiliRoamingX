@@ -6,6 +6,7 @@ import app.revanced.bilibili.patches.okhttp.ApiHook
 import app.revanced.bilibili.settings.Settings
 import app.revanced.bilibili.utils.*
 import app.revanced.bilibili.utils.UposReplacer.isGotchaLiveCdn
+import org.json.JSONArray
 import org.json.JSONObject
 import kotlin.math.abs
 
@@ -13,7 +14,7 @@ object RoomPlayInfo : ApiHook() {
     private const val API = "https://api.live.bilibili.com/xlive/app-room/v2/index/getRoomPlayInfo"
 
     override fun shouldHookBefore(url: String, headers: Array<String>): Boolean {
-        return Settings.DefaultMaxQn() && url.startsWith(API)
+        return url.startsWith(API) && Settings.DefaultMaxQn()
     }
 
     override fun hookBefore(url: String, headers: Array<String>): Pair<String, Array<String>> {
@@ -31,40 +32,32 @@ object RoomPlayInfo : ApiHook() {
     }
 
     override fun shouldHook(url: String, status: Int): Boolean {
-        return Settings.DefaultMaxQn() && status.isOk && url.startsWith(API)
+        return status.isOk && url.startsWith(API) && Settings.DefaultMaxQn()
     }
 
     override fun hook(url: String, status: Int, request: String, response: String): String {
+        if (!Settings.DefaultMaxQn()) return response
+        val requestQn = Uri.parse(url).getQueryParameter("qn")?.toIntOrNull() ?: return response
         val jo = JSONObject(response)
         if (jo.optInt("code") != 0)
             return response
-        if (Settings.DefaultMaxQn()) {
-            val requestQn = Uri.parse(url).getQueryParameter("qn")?.toInt()
-            if (requestQn != null)
-                preferBestCodec(jo, requestQn)
-        }
+        preferBestCodec(jo, requestQn)
         Logger.debug { "RoomPlayInfo, new room play info: $jo" }
         return jo.toString()
     }
 
     private fun preferBestCodec(json: JSONObject, requestQn: Int) {
+        val preference = compareByDescending<JSONObject> { it.optJSONArray("accept_qn")?.length() ?: 0 }
+            .thenBy { abs(requestQn.toLong() - it.optInt("current_qn")) }
+            .thenByDescending { it.optString("codec_name") == "hevc" }
         json.optJSONObject("data")?.optJSONObject("playurl_info")
             ?.optJSONObject("playurl")?.optJSONArray("stream")?.forEach { s ->
-                s.optJSONArray("format")?.forEach { f ->
-                    val codecList = f.optJSONArray("codec")
-                    codecList.orEmpty().asSequence<JSONObject>()
-                        .sortedWith(compareByDescending<JSONObject> {
-                            it.optJSONArray("accept_qn").orEmpty().length()
-                        }.thenBy {
-                            abs(requestQn - it.optInt("current_qn"))
-                        }.thenComparator { a, b ->
-                            val aCodec = a.optString("codec_name")
-                            val bCodec = b.optString("codec_name")
-                            if (aCodec == "hevc") -1 else if (bCodec == "hevc") 1 else 0
-                        }).firstOrNull()?.let { best ->
-                            Logger.debug { "RoomPlayInfo, best codec: $best" }
-                            codecList?.removeIf { it != best }
-                        }
+                s.optJSONArray("format")?.forEach format@{ f ->
+                    val codecs = f.optJSONArray("codec") ?: return@format
+                    if (codecs.length() <= 1) return@format
+                    val best = codecs.asSequence<JSONObject>().minWithOrNull(preference) ?: return@format
+                    Logger.debug { "RoomPlayInfo, best codec: $best" }
+                    f.put("codec", JSONArray().put(best))
                 }
             }
     }

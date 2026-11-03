@@ -164,15 +164,20 @@ object MossPatch {
     @Keep
     @JvmStatic
     fun hookBeforeRequestOkHttp(request: okhttp3.Request): okhttp3.Request {
+        val url = request.url().toString()
+        if (!url.endsWith(PLAY_VIEW_UNITE_API) &&
+            !(fakeToPinkForUnlockAreaLimitApis.any { url.endsWith(it) } && Utils.isPlay() && Settings.UnlockAreaLimit())) {
+            return request
+        }
         val original = request.headers()
         val headers = ArrayList<Map.Entry<String, String>>(original.size())
         for (index in 0 until original.size()) {
             headers.add(AbstractMap.SimpleImmutableEntry(original.name(index), original.value(index)))
         }
-        val url = hookBeforeRequest(request.url().toString(), headers)
+        hookBeforeRequest(url, headers)
         val builder = original.newBuilder()
         headers.forEach { builder.set(it.key, it.value) }
-        return request.newBuilder().url(url).headers(builder.build()).build()
+        return request.newBuilder().headers(builder.build()).build()
     }
 
     @Keep

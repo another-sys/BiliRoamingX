@@ -23,7 +23,8 @@ object DmSegMobile : MossHook<DmSegMobileReq, DmSegMobileReply>() {
         reply: DmSegMobileReply?,
         error: MossException?
     ): DmSegMobileReply? {
-        if (reply != null && Settings.UnlockAreaLimit() && Settings.ThailandServer().isNotEmpty()) {
+        if (reply == null) return super.hookAfter(req, reply, error)
+        if (Settings.UnlockAreaLimit() && Settings.ThailandServer().isNotEmpty()) {
             val epId = req.oid.toString()
             val seasonId = req.pid.toString()
             if (maybeThailand(seasonId, epId))
@@ -31,9 +32,11 @@ object DmSegMobile : MossHook<DmSegMobileReq, DmSegMobileReply>() {
         }
         val noColorfulDanmaku = Settings.NoColorfulDanmaku()
         val timeAirborne = Settings.TimeAirborne()
-        reply?.elemsList?.forEach { elem ->
+        if (!noColorfulDanmaku && !timeAirborne) return super.hookAfter(req, reply, error)
+        val hd = noColorfulDanmaku && Utils.isHd()
+        reply.elemsList.forEach { elem ->
             if (noColorfulDanmaku) {
-                if (!Utils.isHd())
+                if (!hd)
                     elem.colorful = DmColorfulType.NoneType
                 else {
                     elem.clearUnknownFields()
