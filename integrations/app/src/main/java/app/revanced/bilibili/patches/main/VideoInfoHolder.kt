@@ -5,6 +5,7 @@ import app.revanced.bilibili.meta.Season
 import app.revanced.bilibili.meta.VideoInfo
 import app.revanced.bilibili.patches.CopyEnhancePatch
 import app.revanced.bilibili.patches.protobuf.ViewUniteReplyHook
+import app.revanced.bilibili.settings.Settings
 import app.revanced.bilibili.utils.asSequence
 import app.revanced.bilibili.utils.orEmpty
 import app.revanced.bilibili.utils.toJSONObject
@@ -45,7 +46,7 @@ object VideoInfoHolder {
     @JvmStatic
     private fun judgeAiConclusionIfNeeded(info: VideoInfo) {
         val (cid, view) = info
-        if (cid == 0L) return
+        if (cid == 0L || !Settings.EnhanceCommentCopy()) return
         if (view is com.bapis.bilibili.app.view.v1.ViewReply) {
             val aid = view.arc.aid
             val mid = view.arc.author.mid

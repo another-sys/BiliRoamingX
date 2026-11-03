@@ -2,6 +2,7 @@ package app.revanced.bilibili.patches.okhttp.hooks
 
 import android.net.Uri
 import android.os.SystemClock
+import android.util.Pair
 import app.revanced.bilibili.account.Accounts
 import app.revanced.bilibili.http.HttpClient
 import app.revanced.bilibili.patches.json.PegasusPatch
@@ -11,19 +12,37 @@ import app.revanced.bilibili.utils.Utils
 import app.revanced.bilibili.utils.Versions
 import app.revanced.bilibili.utils.bv2av
 import app.revanced.bilibili.utils.bvPattern
+import app.revanced.bilibili.utils.isWifiConnected
 import app.revanced.bilibili.utils.signQuery
 import app.revanced.bilibili.utils.toJSONObject
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.Future
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.SynchronousQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 object FeedIndex : ApiHook() {
     private const val MIN_VIDEOS = 10
     private const val MAX_EMPTY_PAGES = 3
     private const val RECENT_LIMIT = 200
+    private const val REFILL_BUDGET_MS = 6000L
+    private const val PAGE_TIMEOUT_MS = 2500
     private val bvid = Regex(bvPattern)
     private val feedHosts = setOf("app.bilibili.com", "app.biliapi.net", "app.biliapi.com")
     private var recent = LinkedHashSet<Long>()
     private var recentAccount = -1L
+    @Volatile private var expectShortPage = false
+    private class PendingPage(val url: String, val cursor: Long, val expires: Long, val result: Future<JSONObject?>)
+    private var pending: PendingPage? = null
+    private val prefetcher by lazy {
+        ThreadPoolExecutor(0, 1, 15, TimeUnit.SECONDS, SynchronousQueue()) { task: Runnable ->
+            Thread(task, "BiliRoamingX-feed")
+        }
+    }
 
     // 尊重官方，不强制关闭AB实验
     private val newPegasusEnabled by lazy {
@@ -35,6 +54,54 @@ object FeedIndex : ApiHook() {
     override fun shouldHook(url: String, status: Int): Boolean {
         return status.isOk && Versions.ge7_76_0() && url.contains("/x/v2/feed/index?")
                 && newPegasusEnabled
+    }
+
+    override fun shouldHookBefore(url: String, headers: Array<String>) =
+        expectShortPage && url.contains("/x/v2/feed/index?") && Versions.ge9_17_0()
+
+    override fun hookBefore(url: String, headers: Array<String>): Pair<String, Array<String>> {
+        try {
+            val uri = Uri.parse(url)
+            val pull = uri.getQueryParameter("pull")
+            if (uri.isFeed() && uri.getQueryParameter("flush") != "8" && (pull == "true" || pull == "1")) {
+                val idx = uri.getQueryParameter("idx")?.toLongOrNull() ?: 0
+                if (idx in 1 until Long.MAX_VALUE && isWifiConnected())
+                    prefetch(url, uri, idx + 1, Accounts.mid)
+            }
+        } catch (e: Exception) {
+            Logger.warn { "Feed prefetch unavailable (${e.javaClass.simpleName})" }
+        }
+        return Pair.create(url, headers)
+    }
+
+    private fun Uri.isFeed() = scheme == "https" && host in feedHosts && path == "/x/v2/feed/index"
+
+    private fun Uri.queryMap() = queryParameterNames.associateWith { getQueryParameter(it).orEmpty() }
+
+    @Synchronized
+    private fun prefetch(url: String, uri: Uri, cursor: Long, account: Long) {
+        if (!expectShortPage || account != recentAccount) return
+        val now = SystemClock.elapsedRealtime()
+        if (pending?.let { it.expires > now } == true) return
+        try {
+            val result = prefetcher.submit<JSONObject?> { nextPage(uri, uri.queryMap(), cursor, PAGE_TIMEOUT_MS) }
+            pending = PendingPage(url, cursor, now + REFILL_BUDGET_MS, result)
+        } catch (_: RejectedExecutionException) {
+            // Another refresh is already fetching. Never queue speculative requests.
+        }
+    }
+
+    @Synchronized
+    private fun takePrefetch(history: LinkedHashSet<Long>, uri: Uri, cursor: Long?, short: Boolean): PendingPage? {
+        if (history !== recent) return null
+        val idx = uri.getQueryParameter("idx")?.toLongOrNull() ?: 0
+        // For pull=true with a positive idx, 9.17 normally returns idx+1 as the last raw cursor.
+        expectShortPage = short && cursor != null &&
+                (idx == 0L || idx in 1 until Long.MAX_VALUE && cursor == idx + 1)
+        val page = pending ?: return null
+        if (page.url != uri.toString()) return null
+        pending = null
+        return page.takeIf { short && it.cursor == cursor && SystemClock.elapsedRealtime() < it.expires }
     }
 
     override fun hook(url: String, status: Int, request: String, response: String): String {
@@ -87,6 +154,8 @@ object FeedIndex : ApiHook() {
             // An in-flight request for the old account keeps its own history.
             recent = LinkedHashSet()
             recentAccount = account
+            expectShortPage = false
+            pending = null
         }
         return recent
     }
@@ -101,8 +170,7 @@ object FeedIndex : ApiHook() {
     }
 
     private fun fillRefresh(uri: Uri, data: JSONObject, firstCursor: Long?) {
-        if (uri.scheme != "https" || uri.host !in feedHosts
-            || uri.path != "/x/v2/feed/index") return
+        if (!uri.isFeed()) return
         val items = data.optJSONArray("items") ?: return
         val history = historyFor(Accounts.mid)
         val pull = uri.getQueryParameter("pull")
@@ -136,24 +204,41 @@ object FeedIndex : ApiHook() {
         collect(items, original = true)
         data.put("items", merged)
         val initial = ids.size
+        val prefetched = takePrefetch(history, uri, firstCursor, initial < MIN_VIDEOS)
         var pages = 0
+        var usedPrefetch = false
         if (initial < MIN_VIDEOS && firstCursor != null) {
-            val query = uri.queryParameterNames.associateWith { uri.getQueryParameter(it).orEmpty() }
+            val query by lazy(LazyThreadSafetyMode.NONE) { uri.queryMap() }
             var emptyPages = 0
             var cursor = firstCursor
             val cursors = HashSet<Long>()
-            val deadline = SystemClock.elapsedRealtime() + 6000
+            val deadline = SystemClock.elapsedRealtime() + REFILL_BUDGET_MS
             while (ids.size < MIN_VIDEOS && emptyPages < MAX_EMPTY_PAGES && cursor != null && cursors.add(cursor)) {
                 val timeLeft = deadline - SystemClock.elapsedRealtime()
                 if (timeLeft < 300) break
                 pages++
                 val before = ids.size
                 try {
-                    val next = nextPage(uri, query, cursor, timeLeft.coerceAtMost(2500).toInt()) ?: break
+                    val early = if (pages == 1 && prefetched != null) try {
+                        prefetched.result.get(timeLeft.coerceAtMost(PAGE_TIMEOUT_MS.toLong()), TimeUnit.MILLISECONDS)
+                    } catch (_: ExecutionException) {
+                        null
+                    } catch (_: TimeoutException) {
+                        null
+                    } else null
+                    if (early != null) usedPrefetch = true
+                    val next = early ?: run {
+                        val remaining = deadline - SystemClock.elapsedRealtime()
+                        if (remaining < 300) return@run null
+                        nextPage(uri, query, cursor, remaining.coerceAtMost(PAGE_TIMEOUT_MS.toLong()).toInt())
+                    } ?: break
                     val raw = next.optJSONArray("items") ?: break
                     cursor = raw.lastCursor()
                     PegasusPatch.pegasusHook(next)
                     collect(raw, original = false)
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    break
                 } catch (e: Exception) {
                     Logger.warn { "Feed page skipped (${e.javaClass.simpleName})" }
                     break
@@ -161,7 +246,7 @@ object FeedIndex : ApiHook() {
                 emptyPages = if (ids.size == before) emptyPages + 1 else 0
             }
         }
-        Logger.info { "Home refresh: initial=$initial extraPages=$pages uniqueVideos=${ids.size}" }
+        Logger.info { "Home refresh: initial=$initial extraPages=$pages uniqueVideos=${ids.size} prefetched=$usedPrefetch" }
     }
 
     private fun nextPage(uri: Uri, query: Map<String, String>, cursor: Long, timeout: Int): JSONObject? {
