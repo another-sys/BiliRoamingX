@@ -87,6 +87,20 @@ object CommercialPromotionPatch : BytecodePatch() {
             nop
         """.trimIndent())
 
+        // The vertical player shows shopping and game shortcuts alongside ordinary video.
+        val story = "Lcom/bilibili/video/story/StoryDetail;".toClassDef(context).proxy(context)
+        val cart = "Lcom/bilibili/video/story/StoryDetail\$CartIconInfo;"
+        check(cart.toClassDef(context).methods.any {
+            it.name == "getEntryGoto" && it.parameterTypes.isEmpty() && it.returnType == "Ljava/lang/String;"
+        })
+        val entry = story.methods.single {
+            it.name == "getCartIconInfo" && it.parameterTypes.isEmpty() && it.returnType == cart
+        }
+        val getEntryOps = entry.implementation!!.instructions
+        val ret = getEntryOps.indices.single { getEntryOps[it].opcode == Opcode.RETURN_OBJECT }
+        val reg = (getEntryOps[ret] as OneRegisterInstruction).registerA
+        entry.addInstructions(ret, "invoke-static/range {v$reg .. v$reg}, $filter->filterStoryEntry($cart)$cart\nmove-result-object v$reg")
+
         // Filter typed mention groups before the video detail UI chooses a card to render.
         val mentionPkg = "Lcom/bilibili/playerbizcommon3/videomentioned/"
         val mentionType = "Lcom/bapis/bilibili/app/viewunite/common/KMentionType;"

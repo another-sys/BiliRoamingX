@@ -11,6 +11,14 @@ import org.jetbrains.annotations.NotNull;
 @Keep
 /* loaded from: classes8.dex */
 public final class StoryDetail {
+    @Keep
+    public static final class CartIconInfo {
+        @Nullable
+        public final String getEntryGoto() {
+            return null;
+        }
+    }
+
     @JSONField(name = "goto")
     @Nullable
     private String goto1;

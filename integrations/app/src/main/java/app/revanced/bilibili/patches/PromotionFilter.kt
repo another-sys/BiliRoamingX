@@ -3,6 +3,7 @@ package app.revanced.bilibili.patches
 import androidx.annotation.Keep
 import app.revanced.bilibili.settings.Settings
 import com.bilibili.lib.homepage.mine.MenuGroup
+import com.bilibili.video.story.StoryDetail
 
 /** Implemented on the client's navigation items and video mention groups at patch time. */
 @Keep
@@ -37,6 +38,13 @@ object PromotionFilter {
         "MENTION_TYPE_GAME", "MENTION_TYPE_TOY", "MENTION_TYPE_LOTTERY"
     )
     @Keep @JvmStatic fun hiddenMention(type: String?) = Settings.BlockUpRcmdAds() && type in promotedMentionTypes
+
+    @Keep @JvmStatic fun filterStoryEntry(entry: StoryDetail.CartIconInfo?): StoryDetail.CartIconInfo? {
+        return when (entry?.entryGoto) {
+            "cart", "game" -> if ("ad" in Settings.FilterStory()) null else entry
+            else -> entry
+        }
+    }
 
     private inline fun <T> List<T>.withoutHidden(hidden: (T) -> Boolean): List<T> {
         var visible: ArrayList<T>? = null
