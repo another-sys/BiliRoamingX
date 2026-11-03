@@ -31,7 +31,7 @@ internal object FeedWindow {
         fun active() = !stopped && SystemClock.elapsedRealtime() < expires
     }
     private class Page(val json: String, val ids: Set<Long>, val tail: Long, val visibleTail: Long?,
-                       val span: Long, val count: Int, val preload: Boolean)
+                       val span: Long, val count: Int)
     private val lock = Any()
     private var current: Ticket? = null
     private var window: Window? = null
@@ -91,16 +91,17 @@ internal object FeedWindow {
             return null
         }
         finishRequest()
-        if (page.preload) prime(ticket, old.base, idx!!, page.visibleTail, page.tail, page.span)
+        prime(ticket, old.base, idx!!, page.visibleTail, page.tail, page.span)
         Logger.info { "Home feed cache: hit uniqueVideos=${page.ids.size} pages=${page.count} waitMs=${SystemClock.elapsedRealtime() - started} ready=$ready" }
         return page.json
     }
 
-    fun prime(ticket: Ticket, base: Uri, head: Long, visibleTail: Long?, cursor: Long, span: Long) {
-        if (cursor <= 0 || !isWifiConnected()) return
+    fun prime(ticket: Ticket, base: Uri, head: Long, visibleTail: Long?, cursor: Long, span: Long): String {
+        if (cursor <= 0) return "no_cursor"
+        if (!isWifiConnected()) return "no_wifi"
         val job = Window(ticket, base, head, visibleTail, cursor, span)
         synchronized(lock) {
-            if (current !== ticket || window != null || Accounts.mid != ticket.account) return
+            if (current !== ticket || window != null || Accounts.mid != ticket.account) return "superseded"
             window = job
             coordinator.execute {
                 val page = try { prepare(job) }
@@ -108,8 +109,10 @@ internal object FeedWindow {
                 catch (e: Exception) { Logger.warn { "Feed cache preparation stopped (${e.javaClass.simpleName})" }; null }
                 catch (e: LinkageError) { Logger.warn { "Feed cache model unavailable (${e.javaClass.simpleName})" }; null }
                 job.result.complete(page)
+                if (job.active()) Logger.info { "Home feed window: prepared=${page?.ids?.size ?: 0} pages=${page?.count ?: 0}" }
             }
         }
+        return "scheduled"
     }
 
     private fun prepare(job: Window): Page? {
@@ -122,7 +125,6 @@ internal object FeedWindow {
         var span = job.span
         var pages = 0
         var empty = 0
-        var preload = true
         fun fetch(at: Long) = if (job.active() && isWifiConnected() && Accounts.mid == job.owner.account)
             FeedIndex.nextEnvelope(job.base, query, at, TIMEOUT_MS) else null
         // Only the coordinator merges/filters. Requests can finish in any order.
@@ -153,7 +155,7 @@ internal object FeedWindow {
                     if (first) {
                         envelope = raw
                         data = d
-                        preload = FeedIndex.preloadAllowed(d)
+                        FeedIndex.configureScrollRows(d)
                     }
                     val before = ids.size
                     val history = job.owner.history
@@ -172,6 +174,6 @@ internal object FeedWindow {
         }
         if (!job.active() || ids.size < FeedIndex.MIN_VIDEOS) return null
         data!!.put("items", merged)
-        return Page(envelope!!.toString(), ids, cursor, merged.lastCursor(), span, pages, preload)
+        return Page(envelope!!.toString(), ids, cursor, merged.lastCursor(), span, pages)
     }
 }

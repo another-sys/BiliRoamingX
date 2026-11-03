@@ -193,7 +193,7 @@ object FeedIndex : ApiHook() {
         }
     }
 
-    internal fun preloadAllowed(data: JSONObject): Boolean {
+    internal fun configureScrollRows(data: JSONObject) {
         val config = data.optJSONObject("config")
         // Pegasus counts the remaining grid rows and issues its own paginated request.
         // Negative distances and no_preload both disable loading ahead in 9.17.
@@ -202,13 +202,12 @@ object FeedIndex : ApiHook() {
             config.optInt(rowKey) in 0 until LOAD_MORE_ROWS) {
             config.put(rowKey, LOAD_MORE_ROWS)
         }
-        return (config?.optInt("no_preload") ?: 0) == 0 && (config?.optInt(rowKey) ?: 0) >= 0
     }
 
     private fun fillPage(uri: Uri, data: JSONObject, firstCursor: Long?, ticket: FeedWindow.Ticket?) {
         if (!uri.isFeed()) return
         val items = data.optJSONArray("items") ?: return
-        val preload = preloadAllowed(data)
+        configureScrollRows(data)
         if (ticket != null && ticket.account != Accounts.mid) return
         val history = ticket?.history ?: historyFor(Accounts.mid)
         var tail = firstCursor
@@ -287,13 +286,19 @@ object FeedIndex : ApiHook() {
                     deadline = SystemClock.elapsedRealtime() + REFILL_BUDGET_MS
             }
         }
-        if (ticket != null && preload && tail != null && merged.length() > 0) {
-            val head = if (loadMore) idx else merged.optJSONObject(0)?.optLong("idx") ?: 0L
-            FeedWindow.prime(ticket, uri, head, merged.lastCursor(), tail, span)
+        // Native preload flags govern when the UI asks for more. A prepared page can also
+        // satisfy an explicit bottom request without changing the native UI's behavior.
+        val lookahead = when {
+            ticket == null -> "no_request"
+            tail == null || merged.length() == 0 -> "no_cursor"
+            else -> {
+                val head = if (loadMore) idx else merged.optJSONObject(0)?.optLong("idx") ?: 0L
+                FeedWindow.prime(ticket, uri, head, merged.lastCursor(), tail, span)
+            }
         }
         Logger.info {
             val action = if (loadMore) "load more" else "refresh"
-            "Home $action: initial=$initial extraPages=$pages uniqueVideos=${ids.size} prefetched=$usedPrefetch"
+            "Home $action: initial=$initial extraPages=$pages uniqueVideos=${ids.size} prefetched=$usedPrefetch lookahead=$lookahead"
         }
     }
 
