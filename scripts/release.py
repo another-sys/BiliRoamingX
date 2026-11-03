@@ -150,10 +150,12 @@ def patch(config):
     audit_classes = WORK / "audit-classes"
     audit_classes.mkdir(exist_ok=True)
     cli_path = ROOT / ".tools/revanced-cli.jar"
-    run(["javac", "--release", "17", "-cp", cli_path, "-d", audit_classes,
-         ROOT / "scripts/VerifyProtobuf.java"])
-    run(["java", "-Xmx3g", "-cp", os.pathsep.join(map(str, (cli_path, audit_classes))),
-         "VerifyProtobuf", output], WORK / "protobuf-audit.log")
+    for verifier, log_name in (("VerifyProtobuf", "protobuf"),
+                               ("VerifyIntegrationHierarchy", "integration-hierarchy")):
+        run(["javac", "--release", "17", "-cp", cli_path, "-d", audit_classes,
+             ROOT / f"scripts/{verifier}.java"])
+        run(["java", "-Xmx3g", "-cp", os.pathsep.join(map(str, (cli_path, audit_classes))),
+             verifier, output], WORK / f"{log_name}-audit.log")
     assert_identity(apk_identity(output), config["client"])
 
 
@@ -205,7 +207,7 @@ def sign(config):
     metadata = {"source_commit": commit, "source_dirty": dirty, "tag": tag, "client": config["client"],
                 "cli": config["cli"], "excluded_patches": config["excluded_patches"],
                 "release_signer_sha256": signer, "apk": name, "apk_sha256": sha256(DIST / name),
-                "validation": {"patches": "passed", "protobuf_dispatch": "passed", "signature_v1_v2_v3": "passed",
+                "validation": {"patches": "passed", "protobuf_dispatch": "passed", "integration_hierarchy": "passed", "signature_v1_v2_v3": "passed",
                                "zipalign_16k": "passed", "device_runtime": "not tested by this job"}}
     (DIST / "build-info.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
     (DIST / "SHA256SUMS.txt").write_text(

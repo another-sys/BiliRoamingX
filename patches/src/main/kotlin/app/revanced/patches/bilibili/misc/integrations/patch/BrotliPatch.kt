@@ -6,6 +6,7 @@ import app.revanced.patcher.patch.BytecodePatch
 import app.revanced.patcher.patch.annotation.CompatiblePackage
 import app.revanced.patcher.patch.annotation.Patch
 import app.revanced.patches.bilibili.misc.integrations.fingerprints.BrotliFingerprint
+import app.revanced.patches.bilibili.utils.removeFinal
 import app.revanced.util.exception
 
 @Patch(
@@ -20,6 +21,10 @@ import app.revanced.util.exception
 object BrotliPatch : BytecodePatch(setOf(BrotliFingerprint)) {
     override fun execute(context: BytecodeContext) {
         BrotliFingerprint.result?.classDef?.run {
+            // 9.17 makes the host decoder final; the integration adapter subclasses it.
+            context.findClass(this.type)!!.mutableClass.apply {
+                accessFlags = accessFlags.removeFinal()
+            }
             val brotliClass = context.findClass("Lapp/revanced/bilibili/api/BrotliInputStream;")!!
             brotliClass.mutableClass.setSuperClass(this.type)
             brotliClass.mutableClass.methods.first { it.name == "<init>" }.replaceInstruction(
