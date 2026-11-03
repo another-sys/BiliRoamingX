@@ -47,6 +47,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.TreeMap
 import java.util.concurrent.Future
+import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
@@ -136,14 +137,15 @@ value class Area private constructor(val value: String) {
 }
 
 val areaTask: Future<Area> by lazy {
-    Utils.submitTask {
+    // A caller can already be running on Utils' single background handler when it waits for this task.
+    FutureTask {
         when (fetchJson(Constants.ZONE_URL)?.optJSONObject("data")?.optInt("country_code") ?: 0) {
             86 -> Area.China
             852, 853 -> Area.HongKong
             886 -> Area.TaiWan
             else -> Area.Global
         }.also { Logger.debug { "当前地区: $it" } }
-    }
+    }.also { Thread(it, "BiliRoamingX-area").start() }
 }
 
 @get:WorkerThread
