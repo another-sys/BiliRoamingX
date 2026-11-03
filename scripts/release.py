@@ -101,7 +101,8 @@ def assert_patch_log(log):
     # This CLI can exit 0 even when individual patches failed.
     if re.search(r"(?im)(SEVERE:|Invalid register:|no viable alternative|mismatched input|\bfailed(?=[:.!\s]|$)|\b[\w.$]*(?:Exception|Error):)", log):
         raise RuntimeError("Patching reported a failure; refusing to publish a partially patched APK")
-    for name in ("Integrations", "BiliRoamingX settings entrance", "Moss", "OkHttp", "Config", "Pegasus hook", "Commercial promotion filters"):
+    for name in ("Integrations", "BiliRoamingX settings entrance", "Moss", "OkHttp", "Config", "Pegasus hook", "Commercial promotion filters",
+                 "Keep trailing home feed card"):
         if f"{name} succeeded" not in log:
             raise RuntimeError(f"Missing successful core patch: {name}")
 
