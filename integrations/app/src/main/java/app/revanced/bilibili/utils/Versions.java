@@ -49,6 +49,10 @@ public class Versions {
         return KtUtils.getVersionCode() >= 8090000;
     }
 
+    public static boolean ge9_17_0() {
+        return KtUtils.getVersionCode() >= 9170000;
+    }
+
     public static boolean atLeast(String version) {
         String[] split = version.split("\\.");
         if (split.length != 3)

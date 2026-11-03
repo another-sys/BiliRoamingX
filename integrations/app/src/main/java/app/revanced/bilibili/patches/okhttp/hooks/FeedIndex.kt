@@ -21,7 +21,8 @@ object FeedIndex : ApiHook() {
     private const val MAX_EMPTY_PAGES = 3
     private const val RECENT_LIMIT = 200
     private val bvid = Regex(bvPattern)
-    private val recent = LinkedHashSet<Long>()
+    private val feedHosts = setOf("app.bilibili.com", "app.biliapi.net", "app.biliapi.com")
+    private var recent = LinkedHashSet<Long>()
     private var recentAccount = -1L
 
     // 尊重官方，不强制关闭AB实验
@@ -43,7 +44,7 @@ object FeedIndex : ApiHook() {
             val data = resp.optJSONObject("data") ?: return response
             val cursor = data.optJSONArray("items")?.lastCursor()
             PegasusPatch.pegasusHook(data)
-            if (Versions.atLeast("9.17.0")) {
+            if (Versions.ge9_17_0()) {
                 try {
                     fillRefresh(Uri.parse(url), data, cursor)
                 } catch (e: Exception) {
@@ -80,38 +81,64 @@ object FeedIndex : ApiHook() {
             ?: sequenceOf(card.optString("bvid"), param).firstOrNull(bvid::matches)?.let(::bv2av)
     }
 
-    // The app can preload a refresh while another feed request is finishing.
     @Synchronized
-    private fun fillRefresh(uri: Uri, data: JSONObject, firstCursor: Long?) {
-        if (uri.scheme != "https" || uri.host !in setOf("app.bilibili.com", "app.biliapi.net", "app.biliapi.com")
-            || uri.path != "/x/v2/feed/index") return
-        val items = data.optJSONArray("items") ?: return
-        val account = Accounts.mid
+    private fun historyFor(account: Long): LinkedHashSet<Long> {
         if (account != recentAccount) {
-            recent.clear()
+            // An in-flight request for the old account keeps its own history.
+            recent = LinkedHashSet()
             recentAccount = account
         }
+        return recent
+    }
+
+    private fun LinkedHashSet<Long>.trimHistory() {
+        if (size <= RECENT_LIMIT) return
+        val oldest = iterator()
+        while (size > RECENT_LIMIT) {
+            oldest.next()
+            oldest.remove()
+        }
+    }
+
+    private fun fillRefresh(uri: Uri, data: JSONObject, firstCursor: Long?) {
+        if (uri.scheme != "https" || uri.host !in feedHosts
+            || uri.path != "/x/v2/feed/index") return
+        val items = data.optJSONArray("items") ?: return
+        val history = historyFor(Accounts.mid)
         val pull = uri.getQueryParameter("pull")
         val loadMore = uri.getQueryParameter("flush") == "8" ||
                 ((pull == "false" || pull == "0") && uri.getQueryParameter("idx")?.toLongOrNull() != 0L)
-        val ids = LinkedHashSet<Long>()
+        if (loadMore) {
+            synchronized(history) {
+                for (i in 0 until items.length()) {
+                    items.optJSONObject(i)?.let(::videoId)?.let(history::add)
+                }
+                history.trimHistory()
+            }
+            return
+        }
+        val ids = HashSet<Long>()
         val merged = JSONArray()
-        fun collect(page: JSONArray, original: Boolean) {
+        // Claim each page's IDs atomically. Network I/O never holds the history lock.
+        fun collect(page: JSONArray, original: Boolean) = synchronized(history) {
             for (i in 0 until page.length()) {
                 val card = page.optJSONObject(i) ?: continue
                 val id = videoId(card)
                 if (id == null) {
                     if (original) merged.put(card)
-                } else if ((loadMore || id !in recent) && ids.add(id)) {
+                } else if (id !in ids && history.add(id)) {
+                    ids.add(id)
                     merged.put(card)
                 }
             }
+            history.trimHistory()
         }
         collect(items, original = true)
-        if (!loadMore) {
-            data.put("items", merged)
-            val initial = ids.size
-            var pages = 0
+        data.put("items", merged)
+        val initial = ids.size
+        var pages = 0
+        if (initial < MIN_VIDEOS && firstCursor != null) {
+            val query = uri.queryParameterNames.associateWith { uri.getQueryParameter(it).orEmpty() }
             var emptyPages = 0
             var cursor = firstCursor
             val cursors = HashSet<Long>()
@@ -122,7 +149,7 @@ object FeedIndex : ApiHook() {
                 pages++
                 val before = ids.size
                 try {
-                    val next = nextPage(uri, cursor, timeLeft.coerceAtMost(2500).toInt()) ?: break
+                    val next = nextPage(uri, query, cursor, timeLeft.coerceAtMost(2500).toInt()) ?: break
                     val raw = next.optJSONArray("items") ?: break
                     cursor = raw.lastCursor()
                     PegasusPatch.pegasusHook(next)
@@ -133,14 +160,11 @@ object FeedIndex : ApiHook() {
                 }
                 emptyPages = if (ids.size == before) emptyPages + 1 else 0
             }
-            Logger.info { "Home refresh: initial=$initial extraPages=$pages uniqueVideos=${ids.size}" }
         }
-        recent.addAll(ids)
-        while (recent.size > RECENT_LIMIT) recent.iterator().apply { next(); remove() }
+        Logger.info { "Home refresh: initial=$initial extraPages=$pages uniqueVideos=${ids.size}" }
     }
 
-    private fun nextPage(uri: Uri, cursor: Long, timeout: Int): JSONObject? {
-        val query = uri.queryParameterNames.associateWith { uri.getQueryParameter(it).orEmpty() }
+    private fun nextPage(uri: Uri, query: Map<String, String>, cursor: Long, timeout: Int): JSONObject? {
         // 9.17 uses pull=false, flush=8 and the last raw card's idx to load more.
         val paging = mapOf("idx" to cursor.toString(), "pull" to "false", "flush" to "8")
         val url = uri.buildUpon().encodedQuery(signQuery(query, paging)).build().toString()

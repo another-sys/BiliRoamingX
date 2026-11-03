@@ -38,13 +38,26 @@ object PromotionFilter {
     )
     @Keep @JvmStatic fun hiddenMention(type: String?) = Settings.BlockUpRcmdAds() && type in promotedMentionTypes
 
+    private inline fun <T> List<T>.withoutHidden(hidden: (T) -> Boolean): List<T> {
+        var visible: ArrayList<T>? = null
+        for ((index, entry) in withIndex()) {
+            if (hidden(entry)) {
+                if (visible == null) {
+                    visible = ArrayList(size - 1)
+                    visible.addAll(subList(0, index))
+                }
+            } else visible?.add(entry)
+        }
+        return visible ?: this
+    }
+
     @Keep @JvmStatic fun filterMine(groups: List<MenuGroup>?): List<MenuGroup>? {
-        return groups?.filterNot { group ->
+        return groups?.withoutHidden { group ->
             if (group.moduleType == 2 && Settings.PurifyGame() || hidden(group.title, null)) true
             else {
                 val items = group.itemList
-                if (items != null && items.any { hidden(it.title, it.uri) }) {
-                    val visible = items.filterNot { hidden(it.title, it.uri) }
+                val visible = items?.withoutHidden { hidden(it.title, it.uri) }
+                if (visible != null && visible !== items) {
                     group.itemList = visible
                     visible.isEmpty()
                 } else false
@@ -53,7 +66,6 @@ object PromotionFilter {
     }
 
     @Keep @JvmStatic fun filterEntries(entries: List<*>?): List<*>? {
-        if (entries == null || entries.none { it is PromotionEntry && it.brxHideEntry() }) return entries
-        return entries.filterNot { it is PromotionEntry && it.brxHideEntry() }
+        return entries?.withoutHidden { it is PromotionEntry && it.brxHideEntry() }
     }
 }

@@ -14,5 +14,5 @@ object ReleaseCompatibility {
         "custom_update"
     )
 
-    fun unavailable(key: String) = Versions.atLeast("9.17.0") && key in unavailableKeys
+    fun unavailable(key: String) = key in unavailableKeys && Versions.ge9_17_0()
 }

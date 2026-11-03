@@ -127,7 +127,7 @@ public class JSONPatch {
             var keys = Settings.PurifyLivePopups.get();
             if (keys.contains("shoppingCard")) {
                 info.shoppingCardDetail = null;
-                if (Versions.atLeast("9.17.0")) {
+                if (Versions.ge9_17_0()) {
                     info.bubblesDetail = null;
                     info.h5JumpWindowInfoList = null;
                 }
@@ -275,7 +275,7 @@ public class JSONPatch {
         if (Settings.RemoveVipSection.get()) {
             mine.vipSectionV2 = null;
             mine.vipSectionRight = null;
-            if (Versions.atLeast("9.17.0")) mine.modularVipSection = null;
+            if (Versions.ge9_17_0()) mine.modularVipSection = null;
         }
         drawerItems.clear();
         Set<? extends String> items = Settings.ShowingDrawerItems.get();

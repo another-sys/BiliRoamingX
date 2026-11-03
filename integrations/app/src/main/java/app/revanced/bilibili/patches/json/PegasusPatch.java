@@ -840,12 +840,13 @@ public class PegasusPatch {
         long[] uidArray = ArrayUtils.toLongArray(uidSet);
         Set<? extends String> categorySet = Settings.HomeRcmdFilterCategory.get();
         Set<? extends String> channelSet = Settings.HomeRcmdFilterChannel.get();
+        var filterTypes = getFilterTypes();
+        boolean blockAds = filterTypes.contains("ad");
         items.removeIf(item -> {
             var cardGoto = item.cardGoto;
             var cardType = item.cardType;
             var goTo = item.goTo;
-            var filterTypes = getFilterTypes();
-            if (filterTypes.contains("ad"))
+            if (blockAds)
                 removeAdBanner(item);
             var typeMatched = false;
             for (var i = 0; i < filterTypes.size(); i++) {
@@ -928,16 +929,17 @@ public class PegasusPatch {
         long[] uidArray = ArrayUtils.toLongArray(uidSet);
         Set<? extends String> categorySet = Settings.HomeRcmdFilterCategory.get();
         Set<? extends String> channelSet = Settings.HomeRcmdFilterChannel.get();
+        var filterTypes = getFilterTypes();
+        boolean blockAds = filterTypes.contains("ad");
         Jsons.removeIf(items, (item) -> {
             var cardType = item.optString("card_type");
             var cardGoto = item.optString("card_goto");
             var goTo = item.optString("goto");
-            var filterTypes = getFilterTypes();
             var ad = item.optJSONObject("ad_info");
-            if (filterTypes.contains("ad") && (item.optInt("is_ad") == 1 || item.optBoolean("is_ad")
+            if (blockAds && (item.optInt("is_ad") == 1 || item.optBoolean("is_ad")
                     || (ad != null && (ad.optLong("creative_id") > 0 || ad.optJSONObject("creative_content") != null))))
                 return true;
-            if ("banner".equals(cardGoto) && filterTypes.contains("ad")) {
+            if (blockAds && "banner".equals(cardGoto)) {
                 JSONArray bannerItems = item.optJSONArray("banner_item");
                 if (bannerItems != null && bannerItems.length() > 0)
                     Jsons.removeIf(bannerItems, (b) -> "ad".equals(b.optString("type")));
@@ -963,7 +965,7 @@ public class PegasusPatch {
             );
         });
         // The KMP card click handler does not understand the legacy custom reasons.
-        if (!Versions.atLeast("9.17.0"))
+        if (!Versions.ge9_17_0())
             Jsons.forEach(items, PegasusPatch::appendReasons);
     }
 
