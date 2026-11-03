@@ -16,7 +16,6 @@ import com.bapis.bilibili.app.viewunite.common.RelateCard;
 import com.bapis.bilibili.app.viewunite.common.RelateCardType;
 import com.bapis.bilibili.app.viewunite.common.Relates;
 import com.bapis.bilibili.playershared.BizType;
-import com.bilibili.adcommon.basic.model.FeedAdInfo;
 import com.bilibili.app.comm.list.common.api.model.PlayerArgs;
 import com.bilibili.app.comm.list.common.data.DislikeReason;
 import com.bilibili.app.comm.list.common.data.ThreePointItem;
@@ -869,45 +868,7 @@ public class PegasusPatch {
                     uidArray, categorySet, channelSet
             );
         });
-        int column = data.config != null ? data.config.column : 2;
-        align(items, column);
         items.forEach(PegasusPatch::appendReasons);
-    }
-
-    private static void align(ArrayList<BasicIndexItem> items, int column) {
-        if (Utils.isHd() || column % 2 != 0) return;
-        int smallCardCount = 0;
-        int lastSmallCardIndex = -1;
-        for (int i = items.size() - 1; i >= 0; i--) {
-            BasicIndexItem item = items.get(i);
-            String cardType = item.cardType;
-            if (cardType == null) cardType = "";
-            long adCardType = -1;
-            FeedAdInfo adInfo = item.adInfo;
-            if (adInfo != null)
-                adCardType = adInfo.getFeedInfoCardType();
-            boolean isLargeCard = isLargeCard(cardType, adCardType);
-            if (lastSmallCardIndex == -1 && !isLargeCard)
-                lastSmallCardIndex = i;
-            smallCardCount += (isLargeCard ? 2 : 1);
-        }
-        if (smallCardCount % 2 != 0)
-            items.remove(lastSmallCardIndex);
-    }
-
-    private static boolean isLargeCard(String cardType, long adCardType) {
-        return cardType.startsWith("banner_v8")
-                || cardType.startsWith("large_cover")
-                || cardType.startsWith("notify_tunnel")
-                || cardType.startsWith("select")
-                // see com.bilibili.ad.adview.pegasus.holders.AdHolders
-                || (cardType.startsWith("cm")
-                && (adCardType == 27 || adCardType == 41 || adCardType == 42
-                || adCardType == 44 || adCardType == 54 || adCardType == 57
-                || adCardType == 74 || adCardType == 87 || adCardType == 88
-                || adCardType == 100 || adCardType == 98 || adCardType == 101
-                || adCardType == 103 || adCardType == 129 || adCardType == 133
-                || adCardType == 134 || adCardType == 136));
     }
 
     public static void pegasusHook(JSONObject data) throws JSONException {
@@ -1001,31 +962,9 @@ public class PegasusPatch {
                     uidArray, categorySet, channelSet
             );
         });
-        int column = config != null ? config.optInt("column", 2) : 2;
-        align(items, column);
         // The KMP card click handler does not understand the legacy custom reasons.
         if (!Versions.atLeast("9.17.0"))
             Jsons.forEach(items, PegasusPatch::appendReasons);
-    }
-
-    private static void align(JSONArray items, int column) throws JSONException {
-        if (Utils.isHd() || column % 2 != 0) return;
-        int smallCardCount = 0;
-        int lastSmallCardIndex = -1;
-        for (int i = items.length() - 1; i >= 0; i--) {
-            JSONObject item = items.getJSONObject(i);
-            String cardType = item.optString("card_type");
-            long adCardType = -1;
-            JSONObject adInfo = item.optJSONObject("ad_info");
-            if (adInfo != null)
-                adCardType = adInfo.optLong("card_type", -1);
-            boolean isLargeCard = isLargeCard(cardType, adCardType);
-            if (lastSmallCardIndex == -1 && !isLargeCard)
-                lastSmallCardIndex = i;
-            smallCardCount += (isLargeCard ? 2 : 1);
-        }
-        if (smallCardCount % 2 != 0)
-            items.remove(lastSmallCardIndex);
     }
 
     public static void filterViewRelates(ViewReply viewReply) {
