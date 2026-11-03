@@ -101,7 +101,7 @@ def assert_patch_log(log):
     # This CLI can exit 0 even when individual patches failed.
     if re.search(r"(?im)(SEVERE:|Invalid register:|no viable alternative|mismatched input|\bfailed(?=[:.!\s]|$)|\b[\w.$]*(?:Exception|Error):)", log):
         raise RuntimeError("Patching reported a failure; refusing to publish a partially patched APK")
-    for name in ("Integrations", "BiliRoamingX settings entrance", "Moss", "OkHttp", "Config", "Pegasus hook"):
+    for name in ("Integrations", "BiliRoamingX settings entrance", "Moss", "OkHttp", "Config", "Pegasus hook", "Commercial promotion filters"):
         if f"{name} succeeded" not in log:
             raise RuntimeError(f"Missing successful core patch: {name}")
 
@@ -217,6 +217,7 @@ def sign(config):
         "**兼容性预览版。各项增强功能与真机验收结果见本 tag 的兼容性说明。**\n\n"
         f"哔哩哔哩 **{config['client']['version']}**，已集成哔哩漫游 X，Android 7.0+ / ARM64。\n\n"
         f"直接下载 **`{name}`** 安装，无需 Root、LSPosed 或另装模块。\n\n"
+        "默认过滤开屏、首页推广、视频详情和暂停广告，并隐藏商城入口。首次覆盖旧版会自动应用，之后可在模块设置单独调整。\n\n"
         "首次安装与官方包签名不同，需先备份数据并卸载官方版；本仓库后续版本使用固定签名，可覆盖升级。\n\n"
         "模块设置位于客户端设置内。区域相关功能仍取决于可用的解析服务。\n\n"
         f"本版明确停用的补丁：{limitations}。相应开关已禁用，详情见 [兼容性说明](https://github.com/another-sys/BiliRoamingX/blob/{tag}/docs/compatibility.md)。\n\n"

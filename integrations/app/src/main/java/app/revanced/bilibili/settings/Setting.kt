@@ -97,6 +97,7 @@ sealed class Setting<out T : Any>(
         }
 
         private fun migrate() {
+            if (Utils.isMainProcess()) PromotionDefaults.install(prefs)
             if (Utils.isMainProcess() &&
                 (prefs.getBoolean("remove_video_cmd_dms", false)
                         || prefs.getBoolean("purify_search", false))
@@ -126,7 +127,7 @@ sealed class Setting<out T : Any>(
 
 class BooleanSetting(
     key: String,
-    defValue: Boolean = false,
+    defValue: Boolean = key in PromotionDefaults.enabled,
     needReboot: Boolean = false,
     dependency: BooleanSetting? = null,
     onChange: ((value: Boolean, async: Boolean) -> Unit)? = null
@@ -211,7 +212,7 @@ class StringSetting(
 
 class StringSetSetting(
     key: String,
-    defValue: Set<String> = setOf(),
+    defValue: Set<String> = PromotionDefaults.filters[key].orEmpty(),
     needReboot: Boolean = false,
     dependency: BooleanSetting? = null,
     onChange: ((value: Set<String>, async: Boolean) -> Unit)? = null

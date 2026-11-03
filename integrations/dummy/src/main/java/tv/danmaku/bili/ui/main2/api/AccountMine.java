@@ -18,6 +18,8 @@ import java.util.Objects;
 @Keep
 /* loaded from: classes15.dex */
 public class AccountMine {
+    public static class ModularVipSection {}
+    public ModularVipSection modularVipSection;
     @Nullable
     @JSONField(name = "answer")
     public Answer answer;

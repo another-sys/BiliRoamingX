@@ -121,6 +121,16 @@ public class PegasusPatch {
         }).collect(Collectors.toList());
     }
 
+    private static boolean matchesCardType(String value, String type) {
+        if (TextUtils.isEmpty(value)) return false;
+        // Match an ad/cm token, never the "cm" inside ordinary "rcmd" cards.
+        if ("ad".equals(type) || "cm".equals(type)) {
+            return value.equals(type) || value.startsWith(type + "_") || value.endsWith("_" + type)
+                    || value.contains("_" + type + "_");
+        }
+        return value.contains(type);
+    }
+
     private static boolean isNum(String str) {
         return !TextUtils.isEmpty(str) && str.chars().allMatch(Character::isDigit);
     }
@@ -841,9 +851,7 @@ public class PegasusPatch {
             var typeMatched = false;
             for (var i = 0; i < filterTypes.size(); i++) {
                 String type = filterTypes.get(i);
-                if ((!TextUtils.isEmpty(cardGoto) && cardGoto.contains(type))
-                        || (!TextUtils.isEmpty(cardType) && cardType.contains(type))
-                        || (!TextUtils.isEmpty(goTo) && goTo.contains(type))) {
+                if (matchesCardType(cardGoto, type) || matchesCardType(cardType, type) || matchesCardType(goTo, type)) {
                     typeMatched = true;
                     break;
                 } else if ("av".equals(cardGoto) && "cannot_play".equals(type)
@@ -964,6 +972,10 @@ public class PegasusPatch {
             var cardGoto = item.optString("card_goto");
             var goTo = item.optString("goto");
             var filterTypes = getFilterTypes();
+            var ad = item.optJSONObject("ad_info");
+            if (filterTypes.contains("ad") && (item.optInt("is_ad") == 1 || item.optBoolean("is_ad")
+                    || (ad != null && (ad.optLong("creative_id") > 0 || ad.optJSONObject("creative_content") != null))))
+                return true;
             if ("banner".equals(cardGoto) && filterTypes.contains("ad")) {
                 JSONArray bannerItems = item.optJSONArray("banner_item");
                 if (bannerItems != null && bannerItems.length() > 0)
@@ -972,9 +984,7 @@ public class PegasusPatch {
             var typeMatched = false;
             for (var i = 0; i < filterTypes.size(); i++) {
                 String type = filterTypes.get(i);
-                if ((!TextUtils.isEmpty(cardGoto) && cardGoto.contains(type))
-                        || (!TextUtils.isEmpty(cardType) && cardType.contains(type))
-                        || (!TextUtils.isEmpty(goTo) && goTo.contains(type))) {
+                if (matchesCardType(cardGoto, type) || matchesCardType(cardType, type) || matchesCardType(goTo, type)) {
                     typeMatched = true;
                     break;
                 } else if ("av".equals(cardGoto) && "cannot_play".equals(type) && item.optInt("can_play") != 1) {

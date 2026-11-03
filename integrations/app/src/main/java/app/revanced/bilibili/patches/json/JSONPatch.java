@@ -44,6 +44,7 @@ import kotlin.Lazy;
 import kotlin.LazyKt;
 import tv.danmaku.bili.ui.main.event.model.EventEntranceModel;
 import tv.danmaku.bili.ui.main2.api.AccountMine;
+import app.revanced.bilibili.patches.PromotionFilter;
 import tv.danmaku.bili.ui.main2.resource.MainResourceManager;
 import tv.danmaku.bili.ui.offline.api.EpPlayable;
 import tv.danmaku.bili.ui.offline.api.OgvApiResponse;
@@ -260,6 +261,13 @@ public class JSONPatch {
     }
 
     private static void customizeMine(AccountMine mine) {
+        if (Settings.HideCommercialEntries.get()) mine.garbEntrance = null;
+        if (Settings.PurifyGame.get()) mine.gameTips = null;
+        if (Settings.RemoveVipSection.get()) {
+            mine.vipSectionV2 = null;
+            mine.vipSectionRight = null;
+            if (Versions.atLeast("9.17.0")) mine.modularVipSection = null;
+        }
         drawerItems.clear();
         Set<? extends String> items = Settings.ShowingDrawerItems.get();
         boolean purifyRedDot = Settings.PurifyDrawerRedDot.get();
@@ -282,7 +290,7 @@ public class JSONPatch {
                         item.redDot = 0;
                         item.redDotRorNew = false;
                     }
-                    return !"设置".equals(itemTitle) && !showing;
+                    return PromotionFilter.hidden(itemTitle, uri) || (!"设置".equals(itemTitle) && !showing);
                 });
             }
             if (Settings.AddChannel.get()) {
@@ -318,7 +326,7 @@ public class JSONPatch {
                         item.redDot = 0;
                         item.redDotRorNew = false;
                     }
-                    return !"设置".equals(itemTitle) && !showing;
+                    return PromotionFilter.hidden(itemTitle, uri) || (!"设置".equals(itemTitle) && !showing);
                 });
                 MenuGroup.MineButton button = section.button;
                 if (button != null) {
@@ -361,7 +369,8 @@ public class JSONPatch {
                     itemList.add(settingItem);
                 }
             }
-            sectionListV2.removeIf(section -> !TextUtils.isEmpty(section.title) && !shouldShowing(items, section.title));
+            sectionListV2.removeIf(section -> PromotionFilter.hidden(section.title, null)
+                    || (!TextUtils.isEmpty(section.title) && !shouldShowing(items, section.title)));
         }
         if (Settings.CustomTheme.get()) {
             if (Versions.ge7_48_0()) {
@@ -386,7 +395,7 @@ public class JSONPatch {
             var id = tab.tabId;
             var showing = shouldShowing(items, id);
             bottomItems.add(new BottomItem(tab.name, uri, id));
-            return !showing;
+            return !showing || PromotionFilter.hidden(tab.name, uri);
         });
 
         if (!Utils.isHd() && Settings.Drawer.get()) {

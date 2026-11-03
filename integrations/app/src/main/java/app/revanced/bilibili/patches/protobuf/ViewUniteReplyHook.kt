@@ -35,6 +35,7 @@ object ViewUniteReplyHook {
         if (error is NetworkException)
             throw error
         if (viewReply != null) {
+            if (Settings.BlockUpRcmdAds()) viewReply.clearCm()
             val aid = viewReply.arc.aid
             val like = viewReply.reqUser.like
             AutoLikePatch.detail = Pair.create(aid, like)

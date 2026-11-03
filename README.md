@@ -8,6 +8,8 @@
 
 前往 [本仓库 Releases](https://github.com/another-sys/BiliRoamingX/releases)，下载 `Bilibili-9.17.0-BiliRoamingX-…-arm64.apk`。这是已经合并模块的完整客户端，无需 Root、LSPosed 或单独安装模块 APK。
 
+从 rc.4 开始，默认过滤开屏广告、首页推广卡片、视频详情和暂停广告，隐藏会员购、游戏中心等商业入口。覆盖旧版时会应用一次这些设置，保留其他筛选和登录数据。之后可在「哔哩漫游 X」相应页面单独改回。
+
 - 首次安装与官方签名不一致：先备份数据、卸载官方版，再安装本版本。
 - 本仓库使用固定签名；之后从本仓库下载的同包名版本可覆盖升级。请保存签名密钥备份。
 - 设置入口在客户端设置内的「哔哩漫游 X」。区域相关功能需要用户自行配置可用的解析服务；构建不附带服务账号或访问密钥。
@@ -19,7 +21,7 @@
 仓库已提供 [Build installable Bilibili APK](.github/workflows/release-apk.yml)。推送 `v*` tag 会从该提交构建模块与补丁、验证官方 APK、合并、签名，并创建带 APK 的 GitHub 预发布。
 
 ```sh
-tag=v1.24.0-bili9.17.0-rc.4  # 示例，请换成尚未使用的新版本号
+tag=v1.24.0-bili9.17.0-rc.5  # 示例，请换成尚未使用的新版本号
 git tag "$tag"
 git push origin "$tag"
 ```

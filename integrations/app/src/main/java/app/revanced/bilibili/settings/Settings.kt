@@ -73,6 +73,7 @@ object Settings {
     @JvmField val AddMovie = BooleanSetting(key = "add_movie", needReboot = true)
     @JvmField val AddKorea = BooleanSetting(key = "add_korea", needReboot = true)
     @JvmField val PurifyGame = BooleanSetting(key = "purify_game", needReboot = true)
+    @JvmField val HideCommercialEntries = BooleanSetting(key = "hide_commercial_entries", needReboot = true)
     @JvmField val Drawer = BooleanSetting(key = "drawer")
     @JvmField val DisableHomeStory = BooleanSetting(key = "disable_main_page_story", needReboot = true)
     @JvmField val BlockTopActivity =
