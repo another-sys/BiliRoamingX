@@ -9,6 +9,8 @@ import app.revanced.patcher.patch.annotation.Patch
 import app.revanced.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
 import app.revanced.patches.bilibili.utils.*
 import com.android.tools.smali.dexlib2.AccessFlags
+import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 
@@ -108,6 +110,46 @@ object CommercialPromotionPatch : BytecodePatch() {
         }.forEach { ctor ->
             val reg = "p${1 + ctor.parameterTypes.indexOf("Ljava/util/List;").also { check(it >= 0) }}"
             ctor.addInstructions(0, "invoke-static/range {$reg .. $reg}, $filter->filterEntries(Ljava/util/List;)Ljava/util/List;\nmove-result-object $reg")
+        }
+
+        // The other 9.17 player uses Java protobuf messages. Filter just the lists passed
+        // to its UI; keep the underlying protobuf, counts and indexed access consistent.
+        val common = "Lcom/bapis/bilibili/app/viewunite/common/"
+        val mention = "${common}Mention;".toClassDef(context).proxy(context)
+        val enumGetter = mention.methods.single { it.name == "getMType" && it.returnType == "${common}MentionType;" }
+        mention.interfaces.add("Lapp/revanced/bilibili/patches/PromotionEntry;")
+        mention.methods.add(Method(mention.type, "brxHideEntry", "Z", AccessFlags.PUBLIC.value,
+            implementation = MethodImplementation(registerCount = 2)).toMutable().apply {
+            addInstructions("""
+                invoke-virtual {p0}, $enumGetter
+                move-result-object v0
+                invoke-virtual {v0}, Ljava/lang/Enum;->name()Ljava/lang/String;
+                move-result-object v0
+                invoke-static {v0}, $filter->hiddenMention(Ljava/lang/String;)Z
+                move-result v0
+                return v0
+            """.trimIndent())
+        })
+        listOf(
+            "Lcom/bilibili/ship/theseus/ugc/intro/j;",
+            "Lcom/bilibili/ship/theseus/ugc/intro/videomentioned/b;",
+            "Lcom/bilibili/ship/theseus/ugc/relate/UgcAiRelateAsyncRepository;",
+            "Lcom/bilibili/video/story/action/service/StoryVideoMentionedService;"
+        ).forEach { type ->
+            val matches = type.toClassDef(context).proxy(context).methods.flatMap { method ->
+                val ops = method.implementation?.instructions.orEmpty()
+                ops.indices.mapNotNull { i ->
+                    val ref = (ops[i] as? ReferenceInstruction)?.reference as? MethodReference
+                    if (ref?.name != "getMentionsList" || ref.definingClass !in listOf("${common}VideoMentions;",
+                            "Lcom/bapis/bilibili/app/viewunite/v1/VideoMentionsReply;")) null
+                    else {
+                        check(ops[i + 1].opcode == Opcode.MOVE_RESULT_OBJECT)
+                        Triple(method, i + 2, (ops[i + 1] as OneRegisterInstruction).registerA)
+                    }
+                }
+            }
+            val (method, index, reg) = matches.single()
+            method.addInstructions(index, "invoke-static/range {v$reg .. v$reg}, $filter->filterEntries(Ljava/util/List;)Ljava/util/List;\nmove-result-object v$reg")
         }
 
         // At this point v3 holds either AccountMine.sections_v2 or the built-in offline menu.
