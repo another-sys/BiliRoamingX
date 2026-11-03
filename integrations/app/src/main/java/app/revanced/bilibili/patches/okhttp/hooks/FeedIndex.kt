@@ -27,7 +27,7 @@ import java.util.concurrent.TimeoutException
 
 object FeedIndex : ApiHook() {
     private const val MIN_VIDEOS = 10
-    private const val LOAD_MORE_ROWS = 3
+    private const val LOAD_MORE_ROWS = 8
     private const val MAX_EMPTY_PAGES = 3
     private const val RECENT_LIMIT = 200
     private const val REFILL_BUDGET_MS = 6000L
