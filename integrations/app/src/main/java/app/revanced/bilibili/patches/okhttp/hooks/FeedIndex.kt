@@ -36,7 +36,8 @@ object FeedIndex : ApiHook() {
     private val feedHosts = setOf("app.bilibili.com", "app.biliapi.net", "app.biliapi.com")
     private var recent = LinkedHashSet<Long>()
     private var recentAccount = -1L
-    @Volatile private var expectShortPage = false
+    @Volatile private var expectShortRefresh = false
+    @Volatile private var scrollPageSpan = 0L
     private class PendingPage(val url: String, val cursor: Long, val expires: Long, val result: Future<JSONObject?>)
     private var pending: PendingPage? = null
     private val prefetcher by lazy {
@@ -58,16 +59,14 @@ object FeedIndex : ApiHook() {
     }
 
     override fun shouldHookBefore(url: String, headers: Array<String>) =
-        expectShortPage && url.contains("/x/v2/feed/index?") && Versions.ge9_17_0()
+        (expectShortRefresh || scrollPageSpan > 0) && url.contains("/x/v2/feed/index?") && Versions.ge9_17_0()
 
     override fun hookBefore(url: String, headers: Array<String>): Pair<String, Array<String>> {
         try {
             val uri = Uri.parse(url)
-            val pull = uri.getQueryParameter("pull")
-            if (uri.isFeed() && uri.getQueryParameter("flush") != "8" && (pull == "true" || pull == "1")) {
-                val idx = uri.getQueryParameter("idx")?.toLongOrNull() ?: 0
-                if (idx in 1 until Long.MAX_VALUE && isWifiConnected())
-                    prefetch(url, uri, idx + 1, Accounts.mid)
+            if (uri.isFeed()) {
+                val idx = uri.getQueryParameter("idx")?.toLongOrNull() ?: 0L
+                if (idx > 0 && isWifiConnected()) prefetch(url, uri, idx, Accounts.mid)
             }
         } catch (e: Exception) {
             Logger.warn { "Feed prefetch unavailable (${e.javaClass.simpleName})" }
@@ -77,11 +76,25 @@ object FeedIndex : ApiHook() {
 
     private fun Uri.isFeed() = scheme == "https" && host in feedHosts && path == "/x/v2/feed/index"
 
+    private fun Uri.isLoadMore(): Boolean {
+        val pull = getQueryParameter("pull")
+        return getQueryParameter("flush") == "8" ||
+                ((pull == "false" || pull == "0") && getQueryParameter("idx")?.toLongOrNull() != 0L)
+    }
+
     private fun Uri.queryMap() = queryParameterNames.associateWith { getQueryParameter(it).orEmpty() }
 
     @Synchronized
-    private fun prefetch(url: String, uri: Uri, cursor: Long, account: Long) {
-        if (!expectShortPage || account != recentAccount) return
+    private fun prefetch(url: String, uri: Uri, idx: Long, account: Long) {
+        if (account != recentAccount) return
+        val cursor = if (uri.isLoadMore()) {
+            if (scrollPageSpan !in 1 until idx) return
+            idx - scrollPageSpan
+        } else {
+            val pull = uri.getQueryParameter("pull")
+            if (!expectShortRefresh || idx == Long.MAX_VALUE || (pull != "true" && pull != "1")) return
+            idx + 1
+        }
         val now = SystemClock.elapsedRealtime()
         if (pending?.let { it.expires > now } == true) return
         try {
@@ -93,16 +106,23 @@ object FeedIndex : ApiHook() {
     }
 
     @Synchronized
-    private fun takePrefetch(history: LinkedHashSet<Long>, uri: Uri, cursor: Long?, short: Boolean): PendingPage? {
+    private fun takePrefetch(history: LinkedHashSet<Long>, uri: Uri, cursor: Long?, short: Boolean, loadMore: Boolean): PendingPage? {
         if (history !== recent) return null
         val idx = uri.getQueryParameter("idx")?.toLongOrNull() ?: 0
         // For pull=true with a positive idx, 9.17 normally returns idx+1 as the last raw cursor.
-        expectShortPage = short && cursor != null &&
-                (idx == 0L || idx in 1 until Long.MAX_VALUE && cursor == idx + 1)
+        if (loadMore) rememberScrollSpan(history, idx, cursor, short)
+        else expectShortRefresh = short && cursor != null &&
+                    (idx == 0L || idx in 1 until Long.MAX_VALUE && cursor == idx + 1)
         val page = pending ?: return null
         if (page.url != uri.toString()) return null
         pending = null
         return page.takeIf { short && it.cursor == cursor && SystemClock.elapsedRealtime() < it.expires }
+    }
+
+    @Synchronized
+    private fun rememberScrollSpan(history: LinkedHashSet<Long>, idx: Long, cursor: Long?, short: Boolean) {
+        if (history === recent)
+            scrollPageSpan = if (short && cursor != null && cursor in 1 until idx) idx - cursor else 0L
     }
 
     override fun hook(url: String, status: Int, request: String, response: String): String {
@@ -114,7 +134,7 @@ object FeedIndex : ApiHook() {
             PegasusPatch.pegasusHook(data)
             if (Versions.ge9_17_0()) {
                 try {
-                    fillRefresh(Uri.parse(url), data, cursor)
+                    fillPage(Uri.parse(url), data, cursor)
                 } catch (e: Exception) {
                     Logger.warn { "Feed refill stopped (${e.javaClass.simpleName})" }
                 } catch (e: LinkageError) {
@@ -155,7 +175,8 @@ object FeedIndex : ApiHook() {
             // An in-flight request for the old account keeps its own history.
             recent = LinkedHashSet()
             recentAccount = account
-            expectShortPage = false
+            expectShortRefresh = false
+            scrollPageSpan = 0
             pending = null
         }
         return recent
@@ -170,7 +191,7 @@ object FeedIndex : ApiHook() {
         }
     }
 
-    private fun fillRefresh(uri: Uri, data: JSONObject, firstCursor: Long?) {
+    private fun fillPage(uri: Uri, data: JSONObject, firstCursor: Long?) {
         if (!uri.isFeed()) return
         val items = data.optJSONArray("items") ?: return
         val config = data.optJSONObject("config")
@@ -182,19 +203,9 @@ object FeedIndex : ApiHook() {
             config.put(rowKey, LOAD_MORE_ROWS)
         }
         val history = historyFor(Accounts.mid)
-        val pull = uri.getQueryParameter("pull")
-        val loadMore = uri.getQueryParameter("flush") == "8" ||
-                ((pull == "false" || pull == "0") && uri.getQueryParameter("idx")?.toLongOrNull() != 0L)
-        if (loadMore) {
-            synchronized(history) {
-                for (i in 0 until items.length()) {
-                    items.optJSONObject(i)?.let(::videoId)?.let(history::add)
-                }
-                history.trimHistory()
-            }
-            Logger.info { "Home load more: cards=${items.length()}" }
-            return
-        }
+        val loadMore = uri.isLoadMore()
+        // Keep the full scrolling session, then carry the most recent IDs into the next refresh.
+        if (!loadMore) synchronized(history) { history.trimHistory() }
         val ids = HashSet<Long>()
         val merged = JSONArray()
         // Claim each page's IDs atomically. Network I/O never holds the history lock.
@@ -209,12 +220,11 @@ object FeedIndex : ApiHook() {
                     merged.put(card)
                 }
             }
-            history.trimHistory()
         }
         collect(items, original = true)
         data.put("items", merged)
         val initial = ids.size
-        val prefetched = takePrefetch(history, uri, firstCursor, initial < MIN_VIDEOS)
+        val prefetched = takePrefetch(history, uri, firstCursor, initial < MIN_VIDEOS, loadMore)
         var pages = 0
         var usedPrefetch = false
         if (initial < MIN_VIDEOS && firstCursor != null) {
@@ -222,12 +232,14 @@ object FeedIndex : ApiHook() {
             var emptyPages = 0
             var cursor = firstCursor
             val cursors = HashSet<Long>()
+            if (loadMore) uri.getQueryParameter("idx")?.toLongOrNull()?.let(cursors::add)
             val deadline = SystemClock.elapsedRealtime() + REFILL_BUDGET_MS
             while (ids.size < MIN_VIDEOS && emptyPages < MAX_EMPTY_PAGES && cursor != null && cursors.add(cursor)) {
                 val timeLeft = deadline - SystemClock.elapsedRealtime()
                 if (timeLeft < 300) break
                 pages++
                 val before = ids.size
+                val pageStart = cursor
                 try {
                     val early = if (pages == 1 && prefetched != null) try {
                         prefetched.result.get(timeLeft.coerceAtMost(PAGE_TIMEOUT_MS.toLong()), TimeUnit.MILLISECONDS)
@@ -246,6 +258,8 @@ object FeedIndex : ApiHook() {
                     cursor = raw.lastCursor()
                     PegasusPatch.pegasusHook(next)
                     collect(raw, original = false)
+                    // A refresh refill is itself a load-more response and can prime the first scroll.
+                    if (!loadMore) rememberScrollSpan(history, pageStart, cursor, ids.size - before < MIN_VIDEOS)
                 } catch (_: InterruptedException) {
                     Thread.currentThread().interrupt()
                     break
@@ -256,7 +270,10 @@ object FeedIndex : ApiHook() {
                 emptyPages = if (ids.size == before) emptyPages + 1 else 0
             }
         }
-        Logger.info { "Home refresh: initial=$initial extraPages=$pages uniqueVideos=${ids.size} prefetched=$usedPrefetch" }
+        Logger.info {
+            val action = if (loadMore) "load more" else "refresh"
+            "Home $action: initial=$initial extraPages=$pages uniqueVideos=${ids.size} prefetched=$usedPrefetch"
+        }
     }
 
     private fun nextPage(uri: Uri, query: Map<String, String>, cursor: Long, timeout: Int): JSONObject? {
