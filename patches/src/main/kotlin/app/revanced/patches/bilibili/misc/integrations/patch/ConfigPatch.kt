@@ -62,12 +62,16 @@ object ConfigPatch : BytecodePatch(setOf(DanmakuFontSwitchPreferenceFingerprint,
             ?: throw BaseMainFrameFragmentFingerprint.exception
         val configMethodRef = method2.implementation!!.instructions.firstNotNullOf {
             if (it.opcode == Opcode.INVOKE_STATIC && (it as Instruction35c).registerCount == 0) {
-                it.reference as MethodReference
+                (it.reference as MethodReference).takeIf { ref ->
+                    ref.definingClass == configManagerType && ref.returnType == abMethodRef.returnType
+                }
             } else null
         }
         val configGetMethodRef = method2.implementation!!.instructions.firstNotNullOf {
             if (it.opcode == Opcode.INVOKE_INTERFACE && (it as Instruction35c).registerCount == 3) {
-                it.reference as MethodReference
+                (it.reference as MethodReference).takeIf { ref ->
+                    ref.parameterTypes == listOf("Ljava/lang/String;", "Ljava/lang/Object;")
+                }
             } else null
         }
         utilsMethods.first { it.name == "getConfig" }.also { utilsMethods.remove(it) }

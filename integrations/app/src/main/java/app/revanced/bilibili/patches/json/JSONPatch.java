@@ -5,8 +5,6 @@ import android.text.TextUtils;
 import androidx.annotation.Keep;
 
 import com.alibaba.fastjson.annotation.JSONField;
-import com.bilibili.ad.adview.videodetail.danmakuv2.model.Dm;
-import com.bilibili.ad.adview.videodetail.danmakuv2.model.DmAdvert;
 import com.bilibili.app.authorspace.api.BiliSpace;
 import com.bilibili.app.comm.list.widget.recommend.RecommendModeGuidanceConfig;
 import com.bilibili.app.gemini.ugc.feature.share.ShareIconResult;
@@ -57,6 +55,20 @@ import tv.danmaku.bili.ui.splash.event.EventSplashData;
 import tv.danmaku.bili.ui.splash.event.EventSplashDataList;
 
 public class JSONPatch {
+    private static final Map<String, Boolean> MODEL_TYPES = new java.util.concurrent.ConcurrentHashMap<>();
+
+    @Keep
+    public static boolean modelPresent(String name) {
+        return MODEL_TYPES.computeIfAbsent(name, key -> {
+            try {
+                Class.forName(key, false, JSONPatch.class.getClassLoader());
+                return true;
+            } catch (ClassNotFoundException | LinkageError ignored) {
+                return false;
+            }
+        });
+    }
+
     public static List<BottomItem> drawerItems = new ArrayList<>();
     public static List<BottomItem> bottomItems = new ArrayList<>();
     private static final Lazy<String> tabIdFieldName = LazyKt.lazy(() -> {
@@ -77,13 +89,15 @@ public class JSONPatch {
             return parseObjectHookInternal(obj);
         } catch (Throwable t) {
             Logger.error(t, () -> "JSONPatch, parse object hook error");
-            throw t;
+            // Optional model decoration must not turn a valid host response into
+            // a network failure when a newer client changes a field or class.
+            return obj;
         }
     }
 
     private static Object parseObjectHookInternal(Object obj) {
         Object data = (obj instanceof GeneralResponse<?> resp) ? resp.data : obj;
-        if (data instanceof SplashData splashData) {
+        if (modelPresent("tv.danmaku.bili.ui.splash.ad.model.SplashData") && data instanceof SplashData splashData) {
             if (Settings.PurifySplash.get()) try {
                 splashData.splashList.clear();
                 splashData.strategyList.clear();
@@ -91,32 +105,32 @@ public class JSONPatch {
                 splashData.getSplashList().clear();
                 splashData.getStrategyList().clear();
             }
-        } else if (data instanceof SplashShowData showData) {
+        } else if (modelPresent("tv.danmaku.bili.ui.splash.ad.model.SplashShowData") && data instanceof SplashShowData showData) {
             if (Settings.PurifySplash.get()) try {
                 showData.strategyList.clear();
             } catch (Throwable ignored) {
                 showData.getStrategyList().clear();
             }
-        } else if (data instanceof EventEntranceModel) {
+        } else if (modelPresent("tv.danmaku.bili.ui.main.event.model.EventEntranceModel") && data instanceof EventEntranceModel) {
             if (Settings.PurifyGame.get()) {
                 // no problem, see com.bilibili.okretro.BiliApiDataCallback
                 return null;
             }
-        } else if (data instanceof DmAdvert dmAdvert) {
+        } else if (data != null && data.getClass().getSimpleName().equals("DmAdvert")) {
             if (Settings.BlockUpRcmdAds.get()) {
-                List<Dm> ads = dmAdvert.getAds();
+                List<?> ads = Reflex.callMethod(data, "getAds");
                 if (ads != null)
                     ads.clear();
             }
-        } else if (data instanceof LiveShoppingInfo info) {
+        } else if (modelPresent("com.bilibili.bililive.room.biz.shopping.beans.LiveShoppingInfo") && data instanceof LiveShoppingInfo info) {
             if (Settings.PurifyLivePopups.get().contains("shoppingCard")) {
                 info.shoppingCardDetail = null;
                 info.recommendCardDetail = null;
             }
-        } else if (data instanceof LiveGoodsCardInfo || data instanceof LiveShoppingRecommendCardGoodsDetail) {
+        } else if (modelPresent("com.bilibili.bililive.room.biz.shopping.beans.LiveGoodsCardInfo") && data instanceof LiveGoodsCardInfo || modelPresent("com.bilibili.bililive.room.biz.shopping.beans.LiveShoppingRecommendCardGoodsDetail") && data instanceof LiveShoppingRecommendCardGoodsDetail) {
             if (Settings.PurifyLivePopups.get().contains("shoppingCard"))
                 return null;
-        } else if (data instanceof BiliLiveRoomInfo roomInfo) {
+        } else if (modelPresent("com.bilibili.bililive.videoliveplayer.net.beans.gateway.roominfo.BiliLiveRoomInfo") && data instanceof BiliLiveRoomInfo roomInfo) {
             Set<? extends String> keys = Settings.PurifyLivePopups.get();
             BiliLiveRoomInfo.FunctionCard card = roomInfo.functionCard;
             if (keys.contains("follow")) {
@@ -153,13 +167,13 @@ public class JSONPatch {
                 roomInfo.blockInfo = null;
             } catch (Throwable ignored) {
             }
-        } else if (data instanceof LiveRoomRecommendCard) {
+        } else if (modelPresent("com.bilibili.bililive.videoliveplayer.net.beans.attentioncard.LiveRoomRecommendCard") && data instanceof LiveRoomRecommendCard) {
             if (Settings.PurifyLivePopups.get().contains("follow"))
                 return null;
-        } else if (data instanceof LiveRoomReserveInfo info) {
+        } else if (modelPresent("com.bilibili.bililive.room.biz.reverse.bean.LiveRoomReserveInfo") && data instanceof LiveRoomReserveInfo info) {
             if (Settings.PurifyLivePopups.get().contains("reserve"))
                 info.showReserveDetail = false;
-        } else if (data instanceof BiliLiveRoomUserInfo info) {
+        } else if (modelPresent("com.bilibili.bililive.videoliveplayer.net.beans.gateway.userinfo.BiliLiveRoomUserInfo") && data instanceof BiliLiveRoomUserInfo info) {
             Set<? extends String> keys = Settings.PurifyLivePopups.get();
             if (keys.contains("gift")) {
                 FunctionCard card = info.functionCard;
@@ -179,38 +193,38 @@ public class JSONPatch {
                 info.qoe = null;
             } catch (Throwable ignored) {
             }
-        } else if (data instanceof LiveShoppingGotoBuyInfo) {
+        } else if (modelPresent("com.bilibili.bililive.room.biz.shopping.beans.LiveShoppingGotoBuyInfo") && data instanceof LiveShoppingGotoBuyInfo) {
             if (Settings.PurifyLivePopups.get().contains("gotoBuy"))
                 return null;
-        } else if (data instanceof AccountMine accountMine) {
+        } else if (modelPresent("tv.danmaku.bili.ui.main2.api.AccountMine") && data instanceof AccountMine accountMine) {
             customizeMine(accountMine);
-        } else if (data instanceof MainResourceManager.TabResponse tabResponse) {
+        } else if (modelPresent("tv.danmaku.bili.ui.main2.resource.MainResourceManager$TabResponse") && data instanceof MainResourceManager.TabResponse tabResponse) {
             customizeHomeTab(tabResponse.tabData);
-        } else if (data instanceof BiliSpace biliSpace) {
+        } else if (modelPresent("com.bilibili.app.authorspace.api.BiliSpace") && data instanceof BiliSpace biliSpace) {
             customizeSpace(biliSpace);
-        } else if (data instanceof OgvApiResponse<?> ogvApiResponse) {
+        } else if (modelPresent("tv.danmaku.bili.ui.offline.api.OgvApiResponse") && data instanceof OgvApiResponse<?> ogvApiResponse) {
             unlockOgvResponse(ogvApiResponse);
-        } else if (!Utils.isHd() && data instanceof OgvApiResponseV2 ogvApiResponseV2) {
+        } else if (!Utils.isHd() && modelPresent("tv.danmaku.bili.ui.offline.api.OgvApiResponseV2") && data instanceof OgvApiResponseV2 ogvApiResponseV2) {
             unlockOgvResponseV2(ogvApiResponseV2);
-        } else if (data instanceof StoryFeedResponse feedResponse) {
+        } else if (modelPresent("com.bilibili.video.story.api.StoryFeedResponse") && data instanceof StoryFeedResponse feedResponse) {
             PegasusPatch.filterStory(feedResponse);
-        } else if (data instanceof EventSplashDataList splashList) {
+        } else if (modelPresent("tv.danmaku.bili.ui.splash.event.EventSplashDataList") && data instanceof EventSplashDataList splashList) {
             if (Settings.PurifySplash.get()) {
                 List<EventSplashData> eventList = splashList.getEventList();
                 if (eventList != null && !eventList.isEmpty())
                     eventList.removeIf(splash -> !splash.isBirthdayData());
             }
-        } else if (data instanceof RecommendModeGuidanceConfig) {
+        } else if (modelPresent("com.bilibili.app.comm.list.widget.recommend.RecommendModeGuidanceConfig") && data instanceof RecommendModeGuidanceConfig) {
             if (Settings.BlockRecommendGuidance.get())
                 return null;
-        } else if (data instanceof BrandSplashData brandSplashData) {
+        } else if (modelPresent("tv.danmaku.bili.ui.splash.brand.model.BrandSplashData") && data instanceof BrandSplashData brandSplashData) {
             if (Settings.PurifySplash.get()) {
                 brandSplashData.setBrandList(null);
                 brandSplashData.setPreloadList(null);
                 brandSplashData.setQueryList(null);
                 brandSplashData.setShowList(null);
             }
-        } else if (data instanceof ChannelV2 channelV2) {
+        } else if (modelPresent("com.bilibili.pegasus.api.model.ChannelV2") && data instanceof ChannelV2 channelV2) {
             if (Settings.AddChannel.get()) {
                 var tabs = channelV2.tabs;
                 // topic was deprecated by official
@@ -226,10 +240,10 @@ public class JSONPatch {
                     }
                 }
             }
-        } else if ((!Utils.isHd() && data instanceof BiliLiveRoomInfo.DmComboInfo) || data instanceof LiveRoomDanmakuVoteCardInfo) {
+        } else if ((!Utils.isHd() && modelPresent("com.bilibili.bililive.videoliveplayer.net.beans.gateway.roominfo.BiliLiveRoomInfo$DmComboInfo") && data instanceof BiliLiveRoomInfo.DmComboInfo) || modelPresent("com.bilibili.bililive.videoliveplayer.net.beans.gateway.roominfo.LiveRoomDanmakuVoteCardInfo") && data instanceof LiveRoomDanmakuVoteCardInfo) {
             if (Settings.PurifyLivePopups.get().contains("plusOne"))
                 return null;
-        } else if ((Utils.isHd() && data instanceof tv.danmaku.bili.videopage.player.features.share.ShareIconResult) || (!Utils.isHd() && data instanceof ShareIconResult)) {
+        } else if ((Utils.isHd() && modelPresent("tv.danmaku.bili.videopage.player.features.share.ShareIconResult") && data instanceof tv.danmaku.bili.videopage.player.features.share.ShareIconResult) || (!Utils.isHd() && modelPresent("com.bilibili.app.gemini.ugc.feature.share.ShareIconResult") && data instanceof ShareIconResult)) {
             // block share guide for old UGC player
             return null;
         }

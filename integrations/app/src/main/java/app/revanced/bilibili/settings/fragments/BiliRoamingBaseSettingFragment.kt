@@ -18,6 +18,7 @@ import androidx.preference.TwoStatePreference
 import androidx.recyclerview.widget.LinearLayoutManager
 import app.revanced.bilibili.settings.ModulePreferenceManager
 import app.revanced.bilibili.settings.Setting
+import app.revanced.bilibili.settings.ReleaseCompatibility
 import app.revanced.bilibili.settings.search.SearchResultFragment
 import app.revanced.bilibili.settings.search.annotation.SettingFragment
 import app.revanced.bilibili.utils.*
@@ -225,6 +226,12 @@ abstract class BiliRoamingBaseSettingFragment(private var prefsXmlName: String =
 
     override fun onResume() {
         super.onResume()
+        ReleaseCompatibility.unavailableKeys.forEach { key ->
+            if (ReleaseCompatibility.unavailable(key)) findPreference<Preference>(key)?.apply {
+                isEnabled = false
+                summary = "当前 9.17.0 适配版暂不支持；更新请查看本仓库 Releases"
+            }
+        }
         resumed = true
         if (!located) {
             located = true

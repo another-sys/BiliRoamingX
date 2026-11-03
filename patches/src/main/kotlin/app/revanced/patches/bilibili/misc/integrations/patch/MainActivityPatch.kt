@@ -25,7 +25,7 @@ object MainActivityPatch : BytecodePatch() {
                 addInstruction(
                     implementation!!.instructions.size - 1,
                     """
-                    invoke-static {p0}, Lapp/revanced/bilibili/patches/main/MainActivityDelegate;->onCreate(Ltv/danmaku/bili/MainActivityV2;)V
+                    invoke-static/range {p0 .. p0}, Lapp/revanced/bilibili/patches/main/MainActivityDelegate;->onCreate(Ltv/danmaku/bili/MainActivityV2;)V
                 """.trimIndent()
                 )
             }
@@ -33,13 +33,13 @@ object MainActivityPatch : BytecodePatch() {
                 val insertIdx = implementation!!.instructions.indexOfFirst { it.opcode == Opcode.INVOKE_SUPER } + 1
                 addInstruction(
                     insertIdx, """
-                    invoke-static {p0}, Lapp/revanced/bilibili/patches/main/MainActivityDelegate;->onStart(Ltv/danmaku/bili/MainActivityV2;)V
+                    invoke-static/range {p0 .. p0}, Lapp/revanced/bilibili/patches/main/MainActivityDelegate;->onStart(Ltv/danmaku/bili/MainActivityV2;)V
                 """.trimIndent()
                 )
             }
             methods.find { it.name == "onBackPressed" }?.addInstructionsWithLabels(
                 0, """
-                    invoke-static {p0}, Lapp/revanced/bilibili/patches/main/MainActivityDelegate;->onBackPressed(Ltv/danmaku/bili/MainActivityV2;)Z
+                    invoke-static/range {p0 .. p0}, Lapp/revanced/bilibili/patches/main/MainActivityDelegate;->onBackPressed(Ltv/danmaku/bili/MainActivityV2;)Z
                     move-result v0
                     if-eqz v0, :jump
                     return-void
@@ -51,7 +51,7 @@ object MainActivityPatch : BytecodePatch() {
                 val insertIdx = implementation!!.instructions.indexOfFirst { it.opcode == Opcode.INVOKE_SUPER } + 1
                 addInstruction(
                     insertIdx, """
-                    invoke-static {p0, p1}, Lapp/revanced/bilibili/patches/main/MainActivityDelegate;->onSaveInstanceState(Ltv/danmaku/bili/MainActivityV2;Landroid/os/Bundle;)V
+                    invoke-static/range {p0 .. p1}, Lapp/revanced/bilibili/patches/main/MainActivityDelegate;->onSaveInstanceState(Ltv/danmaku/bili/MainActivityV2;Landroid/os/Bundle;)V
                 """.trimIndent()
                 )
             }

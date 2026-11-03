@@ -30,25 +30,6 @@
 
 package com.google.protobuf;
 
-import com.bapis.bilibili.app.distribution.setting.download.DownloadSettingsConfig;
-import com.bapis.bilibili.app.distribution.setting.dynamic.DynamicDeviceConfig;
-import com.bapis.bilibili.app.distribution.setting.experimental.ExperimentalConfig;
-import com.bapis.bilibili.app.distribution.setting.experimental.MultipleTusConfig;
-import com.bapis.bilibili.app.distribution.setting.home.MidHomeConfig;
-import com.bapis.bilibili.app.distribution.setting.night.NightSettingsConfig;
-import com.bapis.bilibili.app.distribution.setting.other.OtherSettingsConfig;
-import com.bapis.bilibili.app.distribution.setting.pegasus.PegasusDeviceConfig;
-import com.bapis.bilibili.app.distribution.setting.pegasus.PegasusDeviceWithoutFplocalConfig;
-import com.bapis.bilibili.app.distribution.setting.pegasus.PegasusMidConfig;
-import com.bapis.bilibili.app.distribution.setting.play.CloudPlayConfig;
-import com.bapis.bilibili.app.distribution.setting.play.MidPlayConfig;
-import com.bapis.bilibili.app.distribution.setting.play.PlayConfig;
-import com.bapis.bilibili.app.distribution.setting.play.SpecificPlayConfig;
-import com.bapis.bilibili.app.distribution.setting.privacy.MidPrivacySettingsConfig;
-import com.bapis.bilibili.app.distribution.setting.privacy.PrivacySettingsConfig;
-import com.bapis.bilibili.app.distribution.setting.search.SearchDeviceConfig;
-import com.bapis.bilibili.app.distribution.setting.story.MidStoryConfig;
-import com.bapis.bilibili.app.distribution.setting.story.StoryConfig;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -79,27 +60,33 @@ public final class MessageLiteToStringEx {
 
     static {
         Arrays.fill(INDENT_BUFFER, ' ');
-        typeMap.put("type.googleapis.com/bilibili.app.distribution.download.v1.DownloadSettingsConfig", DownloadSettingsConfig.class);
-        typeMap.put("type.googleapis.com/bilibili.app.distribution.dynamic.v1.DynamicDeviceConfig", DynamicDeviceConfig.class);
-        typeMap.put("type.googleapis.com/bilibili.app.distribution.experimental.v1.ExperimentalConfig", ExperimentalConfig.class);
-        typeMap.put("type.googleapis.com/bilibili.app.distribution.experimental.v1.MultipleTusConfig", MultipleTusConfig.class);
-        typeMap.put("type.googleapis.com/bilibili.app.distribution.night.v1.NightSettingsConfig", NightSettingsConfig.class);
-        typeMap.put("type.googleapis.com/bilibili.app.distribution.other.v1.MidPrivacySettingsConfig", MidPrivacySettingsConfig.class);
-        typeMap.put("type.googleapis.com/bilibili.app.distribution.other.v1.OtherSettingsConfig", OtherSettingsConfig.class);
-        typeMap.put("type.googleapis.com/bilibili.app.distribution.other.v1.PrivacySettingsConfig", PrivacySettingsConfig.class);
-        typeMap.put("type.googleapis.com/bilibili.app.distribution.pegasus.v1.PegasusDeviceConfig", PegasusDeviceConfig.class);
-        typeMap.put("type.googleapis.com/bilibili.app.distribution.play.v1.CloudPlayConfig", CloudPlayConfig.class);
-        typeMap.put("type.googleapis.com/bilibili.app.distribution.play.v1.PlayConfig", PlayConfig.class);
-        typeMap.put("type.googleapis.com/bilibili.app.distribution.play.v1.SpecificPlayConfig", SpecificPlayConfig.class);
-        typeMap.put("type.googleapis.com/bilibili.app.distribution.search.v1.SearchDeviceConfig", SearchDeviceConfig.class);
+        registerType("type.googleapis.com/bilibili.app.distribution.download.v1.DownloadSettingsConfig", "com.bapis.bilibili.app.distribution.setting.download.DownloadSettingsConfig");
+        registerType("type.googleapis.com/bilibili.app.distribution.dynamic.v1.DynamicDeviceConfig", "com.bapis.bilibili.app.distribution.setting.dynamic.DynamicDeviceConfig");
+        registerType("type.googleapis.com/bilibili.app.distribution.experimental.v1.ExperimentalConfig", "com.bapis.bilibili.app.distribution.setting.experimental.ExperimentalConfig");
+        registerType("type.googleapis.com/bilibili.app.distribution.experimental.v1.MultipleTusConfig", "com.bapis.bilibili.app.distribution.setting.experimental.MultipleTusConfig");
+        registerType("type.googleapis.com/bilibili.app.distribution.night.v1.NightSettingsConfig", "com.bapis.bilibili.app.distribution.setting.night.NightSettingsConfig");
+        registerType("type.googleapis.com/bilibili.app.distribution.other.v1.MidPrivacySettingsConfig", "com.bapis.bilibili.app.distribution.setting.privacy.MidPrivacySettingsConfig");
+        registerType("type.googleapis.com/bilibili.app.distribution.other.v1.OtherSettingsConfig", "com.bapis.bilibili.app.distribution.setting.other.OtherSettingsConfig");
+        registerType("type.googleapis.com/bilibili.app.distribution.other.v1.PrivacySettingsConfig", "com.bapis.bilibili.app.distribution.setting.privacy.PrivacySettingsConfig");
+        registerType("type.googleapis.com/bilibili.app.distribution.pegasus.v1.PegasusDeviceConfig", "com.bapis.bilibili.app.distribution.setting.pegasus.PegasusDeviceConfig");
+        registerType("type.googleapis.com/bilibili.app.distribution.play.v1.CloudPlayConfig", "com.bapis.bilibili.app.distribution.setting.play.CloudPlayConfig");
+        registerType("type.googleapis.com/bilibili.app.distribution.play.v1.PlayConfig", "com.bapis.bilibili.app.distribution.setting.play.PlayConfig");
+        registerType("type.googleapis.com/bilibili.app.distribution.play.v1.SpecificPlayConfig", "com.bapis.bilibili.app.distribution.setting.play.SpecificPlayConfig");
+        registerType("type.googleapis.com/bilibili.app.distribution.search.v1.SearchDeviceConfig", "com.bapis.bilibili.app.distribution.setting.search.SearchDeviceConfig");
+        registerType("type.googleapis.com/bilibili.app.distribution.pegasus.v1.PegasusMidConfig", "com.bapis.bilibili.app.distribution.setting.pegasus.PegasusMidConfig");
+        registerType("type.googleapis.com/bilibili.app.distribution.story.v1.MidStoryConfig", "com.bapis.bilibili.app.distribution.setting.story.MidStoryConfig");
+        registerType("type.googleapis.com/bilibili.app.distribution.story.v1.StoryConfig", "com.bapis.bilibili.app.distribution.setting.story.StoryConfig");
+        registerType("type.googleapis.com/bilibili.app.distribution.pegasus.v1.PegasusDeviceWithoutFplocalConfig", "com.bapis.bilibili.app.distribution.setting.pegasus.PegasusDeviceWithoutFplocalConfig");
+        registerType("type.googleapis.com/bilibili.app.distribution.play.v1.MidPlayConfig", "com.bapis.bilibili.app.distribution.setting.play.MidPlayConfig");
+        registerType("type.googleapis.com/bilibili.app.distribution.home.v1.MidHomeConfig", "com.bapis.bilibili.app.distribution.setting.home.MidHomeConfig");
+    }
+
+    private static void registerType(String url, String className) {
         try {
-            typeMap.put("type.googleapis.com/bilibili.app.distribution.pegasus.v1.PegasusMidConfig", PegasusMidConfig.class);
-            typeMap.put("type.googleapis.com/bilibili.app.distribution.story.v1.MidStoryConfig", MidStoryConfig.class);
-            typeMap.put("type.googleapis.com/bilibili.app.distribution.story.v1.StoryConfig", StoryConfig.class);
-            typeMap.put("type.googleapis.com/bilibili.app.distribution.pegasus.v1.PegasusDeviceWithoutFplocalConfig", PegasusDeviceWithoutFplocalConfig.class);
-            typeMap.put("type.googleapis.com/bilibili.app.distribution.play.v1.MidPlayConfig", MidPlayConfig.class);
-            typeMap.put("type.googleapis.com/bilibili.app.distribution.home.v1.MidHomeConfig", MidHomeConfig.class);
-        } catch (Throwable ignored) {
+            typeMap.put(url, Class.forName(className, false,
+                    MessageLiteToStringEx.class.getClassLoader()).asSubclass(MessageLite.class));
+        } catch (ClassNotFoundException | LinkageError ignored) {
+            // Optional distribution models have been removed in newer clients.
         }
     }
 
@@ -117,7 +104,12 @@ public final class MessageLiteToStringEx {
     static String toString(MessageLite messageLite, String commentString) {
         StringBuilder buffer = new StringBuilder();
         buffer.append("# ").append(commentString);
-        reflectivePrintWithIndent(messageLite, buffer, 0);
+        try {
+            reflectivePrintWithIndent(messageLite, buffer, 0);
+        } catch (RuntimeException | LinkageError error) {
+            // Diagnostic formatting must never crash a host network request.
+            buffer.append(" [fields unavailable: ").append(error.getClass().getSimpleName()).append(']');
+        }
         return buffer.toString();
     }
 

@@ -12,7 +12,10 @@ plugins {
 group = "app.revanced.bilibili"
 
 dependencies {
-    implementation(libs.revanced.patcher)
+    // The original GitHub Maven registry requires an upstream package token.
+    // Use the identical patcher API bundled in the pinned, checksum-verified CLI.
+    // Bootstrap it with: python scripts/release.py tools
+    implementation(files(rootProject.file(".tools/revanced-cli.jar")))
     implementation(libs.smali)
     // Used in JsonGenerator.
     implementation(libs.gson)

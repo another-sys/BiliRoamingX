@@ -43,7 +43,11 @@ sealed class Setting<out T : Any>(
         save(defValue)
     }
 
+    @Suppress("UNCHECKED_CAST")
     fun get(): T {
+        if (ReleaseCompatibility.unavailable(key)) {
+            return if (defValue is Boolean) false as T else defValue
+        }
         return if (Accounts.userBlocked || (dependency != null && !dependency.get())) defValue else value
     }
 

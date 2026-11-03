@@ -35,7 +35,8 @@ object PlayerToastPatch : BytecodePatch(setOf(ShowPlayerToastFingerprint)) {
             showToastMethodName = mutableClass.methods.first { m ->
                 m.accessFlags.let { !it.isStatic() && it.isPublic() }
                         && (m.implementation?.instructions?.any { inst ->
-                    inst.opcode == Opcode.INVOKE_DIRECT && (inst as BuilderInstruction35c).reference == mutableMethod
+                    (inst.opcode == Opcode.INVOKE_DIRECT || inst.opcode == Opcode.INVOKE_VIRTUAL) &&
+                            (inst as? BuilderInstruction35c)?.reference == mutableMethod
                 } ?: false)
             }.name
             mutableMethod.addInstructionsWithLabels(

@@ -11,6 +11,10 @@ object ForceCommentNavigablePatch {
 
     @Keep
     @JvmStatic
+    fun seekEnabled(original: Boolean) = original || enabled()
+
+    @Keep
+    @JvmStatic
     fun onPrimaryCommentMainFragmentCreate(fragment: BaseFragment) {
         if (enabled()) {
             fragment.arguments?.putBoolean("enableTimeParser", true)

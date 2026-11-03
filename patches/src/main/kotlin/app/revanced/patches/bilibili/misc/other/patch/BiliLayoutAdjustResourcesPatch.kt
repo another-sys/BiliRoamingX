@@ -82,6 +82,9 @@ object BiliLayoutAdjustResourcesPatch : ResourcePatch() {
                 }
             }
         }
+        // 9.x replaced this layout and removed the resources used by the old
+        // replacement. Keep the host layout when that ABI is no longer present.
+        if (!context["res/drawable/theseus_shape_arrow_button_bg.xml", false].exists()) return
         runCatching {
             var playlistTitleNewLayout = true
             context.document["res/layout/theseus_playlist_title.xml"].use { dom ->
@@ -225,7 +228,7 @@ object BiliLayoutAdjustResourcesPatch : ResourcePatch() {
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="4dp"
-                            android:text="@string/theseus_playlist_default_order"
+                            android:text="默认排序"
                             android:textColor="@color/Text3" />
                     </LinearLayout>
 
@@ -358,7 +361,7 @@ object BiliLayoutAdjustResourcesPatch : ResourcePatch() {
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="4dp"
-                            android:text="@string/theseus_playlist_default_order"
+                            android:text="默认排序"
                             android:textColor="@color/Text3" />
                     </LinearLayout>
 

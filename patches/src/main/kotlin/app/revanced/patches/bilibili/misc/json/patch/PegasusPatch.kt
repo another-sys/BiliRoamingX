@@ -11,6 +11,7 @@ import app.revanced.patcher.util.proxy.mutableTypes.MutableMethod
 import app.revanced.patches.bilibili.misc.json.fingerprints.CardClickProcessorFingerprint
 import app.revanced.patches.bilibili.misc.json.fingerprints.CardClickProcessorNewFingerprint
 import app.revanced.patches.bilibili.misc.json.fingerprints.PegasusParserFingerprint
+import app.revanced.patches.bilibili.misc.okhttp.patch.OkHttpPatch
 import app.revanced.patches.bilibili.utils.annotation
 import app.revanced.patches.bilibili.utils.cloneMutable
 import app.revanced.patches.bilibili.utils.proxy
@@ -21,6 +22,7 @@ import com.android.tools.smali.dexlib2.iface.value.StringEncodedValue
 @Patch(
     name = "Pegasus hook",
     description = "首页推荐流hook",
+    dependencies = [OkHttpPatch::class],
     compatiblePackages = [
         CompatiblePackage(name = "tv.danmaku.bili"),
         CompatiblePackage(name = "tv.danmaku.bilibilihd"),
@@ -35,6 +37,12 @@ object PegasusPatch : BytecodePatch(
     )
 ) {
     override fun execute(context: BytecodeContext) {
+        // 9.x uses KMP FeedItem models. Filter the JSON response in FeedIndex
+        // before deserialization; the old BasicIndexItem ABI is incompatible.
+        if (context.findClass("Lcom/bilibili/pegasus/api/model/BasicIndexItem;")
+                ?.immutableClass?.superclass == "Lcom/bilibili/bilifeed/card/FeedItem;") {
+            return
+        }
         PegasusParserFingerprint.result?.run {
             val method = mutableClass.methods.first {
                 it.returnType == "Lcom/bilibili/okretro/GeneralResponse;"
@@ -56,7 +64,9 @@ object PegasusPatch : BytecodePatch(
         val (stockBannersItemClass, bannerItemFiled) = context.classes.firstNotNullOfOrNull { c ->
             if (c.superclass == "Lcom/bilibili/pegasus/api/model/BasicIndexItem;") c.fields.find {
                 it.annotation("Lcom/alibaba/fastjson/annotation/JSONField;")
-                    ?.value<StringEncodedValue>("name")?.value == "banner_item"
+                    ?.value<StringEncodedValue>("name")?.value == "banner_item" ||
+                        it.annotation("Lcom/google/gson/annotations/SerializedName;")
+                            ?.value<StringEncodedValue>("value")?.value == "banner_item"
             }?.let { c to it } else null
         } ?: throw PatchException("not found banner item field")
         val myBannersItemClassName = "Lapp/revanced/bilibili/meta/pegasus/BannersItem;"

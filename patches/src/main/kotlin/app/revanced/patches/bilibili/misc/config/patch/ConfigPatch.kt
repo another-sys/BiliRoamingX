@@ -85,19 +85,21 @@ object ConfigPatch : BytecodePatch(
 
         val ddContractInterface = DDContractImplFingerprint.result?.classDef?.interfaces?.first()
             ?: return
+        // New clients also implement Contract for non-string values and inherit
+        // some getters. Only wrap getters actually declared by each implementation.
         context.classes.filter { it.interfaces == listOf(ddContractInterface) }.forEach { c ->
             c.proxy(context).run {
                 fun Method.args() = (0..parameterTypes.size).joinToString { "p$it" }
 
-                val getStringMethod = methods.first { m ->
+                val getStringMethod = methods.firstOrNull { m ->
                     m.returnType == "Ljava/lang/String;" && m.parameterTypes.let {
-                        it[0] == "Ljava/lang/String;" && it[1] == "Ljava/lang/String;"
+                        it.size >= 2 && it[0] == "Ljava/lang/String;" && it[1] == "Ljava/lang/String;"
                     }
                 }
-                getStringMethod.cloneMutable(
+                getStringMethod?.cloneMutable(
                     registerCount = getStringMethod.parameterTypes.size + 2,
                     clearImplementation = true
-                ).apply {
+                )?.apply {
                     getStringMethod.name += "_Origin"
                     addInstructions(
                         0, """
@@ -108,17 +110,17 @@ object ConfigPatch : BytecodePatch(
                         return-object v0
                     """.trimIndent()
                     )
-                }.also { methods.add(it) }
+                }?.also { methods.add(it) }
 
-                val getBooleanMethod = methods.first { m ->
+                val getBooleanMethod = methods.firstOrNull { m ->
                     m.returnType == "Z" && m.parameterTypes.let {
-                        it[0] == "Ljava/lang/String;" && it[1] == "Z"
+                        it.size >= 2 && it[0] == "Ljava/lang/String;" && it[1] == "Z"
                     }
                 }
-                getBooleanMethod.cloneMutable(
+                getBooleanMethod?.cloneMutable(
                     registerCount = getBooleanMethod.parameterTypes.size + 3,
                     clearImplementation = true
-                ).apply {
+                )?.apply {
                     getBooleanMethod.name += "_Origin"
                     addInstructions(
                         0, """
@@ -135,7 +137,7 @@ object ConfigPatch : BytecodePatch(
                         return v0
                     """.trimIndent()
                     )
-                }.also { methods.add(it) }
+                }?.also { methods.add(it) }
             }
         }
     }

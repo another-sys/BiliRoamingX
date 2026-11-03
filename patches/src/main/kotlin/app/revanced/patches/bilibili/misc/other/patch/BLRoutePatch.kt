@@ -30,10 +30,10 @@ object BLRoutePatch : BytecodePatch(setOf(BLRouteBuilderFingerprint, RouteReques
             invoke-static {p1}, Lapp/revanced/bilibili/patches/BLRoutePatch;->intercept(Landroid/net/Uri;)Landroid/net/Uri;
             move-result-object p1
         """.trimIndent()
-        ) ?: throw BLRouteBuilderFingerprint.exception
+        ) // Recent clients merged Builder into RouteRequest.
         val result = RouteRequestFingerprint.result
         result?.mutableClass?.methods?.find { m ->
-            m.name == "<init>" && m.parameterTypes.let { it.size == 2 && it[0] == "Landroid/net/Uri;" }
+            m.name == "<init>" && m.parameterTypes == listOf("Landroid/net/Uri;")
         }?.addInstructions(
             0, """
             invoke-static {p1}, Lapp/revanced/bilibili/patches/BLRoutePatch;->intercept(Landroid/net/Uri;)Landroid/net/Uri;

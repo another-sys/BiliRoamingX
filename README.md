@@ -1,78 +1,67 @@
-<div align="center">
+# 哔哩漫游 X · 9.17 适配版
 
-# 哔哩漫游X
+基于 [BiliRoamingX/BiliRoamingX](https://github.com/BiliRoamingX/BiliRoamingX) 的公开派生项目，保留 GPL-3.0 许可。当前构建目标为官方粉版 **9.17.0（9170300）、ARM64、Android 7.0 及以上**。
 
-[![CI](https://github.com/BiliRoamingX/BiliRoamingX/workflows/CI/badge.svg)](https://github.com/BiliRoamingX/BiliRoamingX/actions)
-[![Channel](https://img.shields.io/badge/Follow-Telegram-blue?logo=telegram)](https://t.me/bb_show)
-[![Download](https://img.shields.io/github/downloads/BiliRoamingX/BiliRoamingX-PreBuilds/total?color=critical&label=Download&logo=data:image/png;base64,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)](https://github.com/BiliRoamingX/BiliRoamingX/releases/latest)
-[![Star](https://img.shields.io/github/stars/BiliRoamingX/BiliRoamingX?label=Star&color=important&logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAdCAYAAAC5UQwxAAADKUlEQVRIib2WX0iTURTAz737tpWEissM6c9cOUUkCqmHpYEtfAiFyl4yCoQefOmhHozAECGweskMw+hRitRQsD8ULSl0H1mUIDRr5myVpgvJQvP7f+P7Nsfc9s3dMTpw4ePee87vnHvvOeeD/y2IEEKNFOYHMom8lGHedGKWVjcloDJu7QLxRz7exTtpdRlqmurlot+KAHAqutRKsu/YeaQABgIge/e30upTR2hY6K8FEzhADfE3q9DqU0Uo+uoaQFCpQU01UmXS2UJjg+7RjCI3EHBoQFUIABFhGO0lFcmaSDpC6cuZ01p0kZcQilL21TQmayfpCMkoGkIA5TEuKlqkLL/dVWG2ONe80xggH7iXj4XPdiz5rUicKgDBZ8OC36Y+EsDggGj/1HlZ+2KJectXhSnwEaN1Ckw2n8zs8JrzTn1ftZ2bbjeb5i42gwHKkLy0QVNWwBE2hiNGIlEixopTGFjtvg0Zf4kEb+W8C1e1CCVP2XXm1/t9kAGO1NI5gajwJWBJVqEXlXrrNfNMybtzYu6RXuCBTTMOgAOW5FYOqjCIfKVGe3+baDnaC8tphC4Dq+Q4Xcg+eGllatUBGgv72kRLbXdaoBrskAvbXc2R0zE3Zix80C5Zjgeh9I0kAlb1DNufN0cv6eahOFnXYFzoPgmMUk4FE9Gwkl39EO8cuBZvOWHiK2NZj7H053C4lK0lMgDBxpdot1CptzNhEmCymKnlYrKiWiNiwg6kC+R/9uWAqGCqvEQASAIszHYWUwOx4CkNVxwaIeBAwoSdGogEb6wSClUOtWvwoe/oI1cbszBeqmdX97yR4C2KcYcL1kcpt/4O4PUcE7h1VqudplBJDDmAhU9F9EDxY3EYKGiFmZWzK11SXlOLOftgsA1t67gvT9Q0GhYeaUcJ5tDfgOS36tkFNS3iDWUUhsgbIOQ1uGXPnhtcoGej3l5u/sk6yeNoJSPgJiNAyDtwc/MvcLy98Q3MdJSQIXArY9YubqbTrgeKHnzgbr78oeQ2eQVu8VtTVbw9cRNfnL58APFzmxnbzR7do0kg4lRjNWGwZNp65Wkq+ukTAPgHIIGzcZjmG+EAAAAASUVORK5CYII=)](https://github.com/BiliRoamingX/BiliRoamingX)
+**这是兼容性预览版，尚未恢复上游全部增强功能。** 具体范围和验证记录见 [兼容性说明](docs/compatibility.md)。不支持以同一配置构建 Play 版、HD 版或任意其他版本。
 
-</div>
+## 下载安装
 
-基于 ReVanced 实现的B站 Android 客户端增强模块。模块设置完美融入 APP 设置，功能丰富，自定义程度高。
-得益于实现方式，对 APP 性能几乎没有影响，流畅、迅速、启动快。支持粉版、Play 版及 HD 版。
+前往 [本仓库 Releases](https://github.com/another-sys/BiliRoamingX/releases)，下载 `Bilibili-9.17.0-BiliRoamingX-…-arm64.apk`。这是已经合并模块的完整客户端，无需 Root、LSPosed 或单独安装模块 APK。
 
-## 📖 主要功能
+- 首次安装与官方签名不一致：先备份数据、卸载官方版，再安装本版本。
+- 本仓库使用固定签名；之后从本仓库下载的同包名版本可覆盖升级。请保存签名密钥备份。
+- 设置入口在客户端设置内的「哔哩漫游 X」。区域相关功能需要用户自行配置可用的解析服务；构建不附带服务账号或访问密钥。
+- `BiliRoamingX-integrations-*.apk` 是构建模块，**不是**完整客户端。普通用户下载以 `Bilibili-` 开头的 APK。
+- 每个发布附带 `SHA256SUMS.txt`、`build-info.json` 及对应 tag 源码。
 
-- 解除番剧区域限制
-- 自由移除页面组件
-- 自定义直播、视频默认清晰度
-- 自定义播放速度
-- 字幕样式调整，翻译、保存及导入
-- 调整 APP 显示大小
-- 自由复制评论及视频信息
-- 双指缩放视频填充屏幕
-- 调用外部下载器保存视频
-- 加回频道功能
-- 自动领取B币券
-- 分享链接净化
-- 推荐、热门、动态过滤
-- 开屏页背景色跟随深色模式
-- 更多功能见下图
+## 打 tag 自动构建
 
-## 📱 功能截图
-<div align="center">
-<div>
-<img src="assets/images/Screenshot_1.png" width="30%" />
-<img src="assets/images/Screenshot_2.png" width="30%" />
-<img src="assets/images/Screenshot_3.png" width="30%" />
-<img src="assets/images/Screenshot_4.png" width="30%" />
-<img src="assets/images/Screenshot_5.png" width="30%" />
-<img src="assets/images/Screenshot_6.png" width="30%" />
-<img src="assets/images/Screenshot_7.png" width="30%" />
-<img src="assets/images/Screenshot_8.png" width="30%" />
-<img src="assets/images/Screenshot_9.png" width="30%" />
-</div>
-</div>
+仓库已提供 [Build installable Bilibili APK](.github/workflows/release-apk.yml)。推送 `v*` tag 会从该提交构建模块与补丁、验证官方 APK、合并、签名，并创建带 APK 的 GitHub 预发布。
 
-## 💻 源码构建
-
-```shell
-git clone --recurse-submodules https://github.com/BiliRoamingX/BiliRoamingX.git
-cd BiliRoamingX
-./gradlew dist
+```sh
+git tag v1.24.0-bili9.17.0-rc.2
+git push origin v1.24.0-bili9.17.0-rc.2
 ```
-- Windows 系统上使用 `gradlew.bat` 命令而不是 `./gradlew`
-- 构建产物在 `build` 目录下
 
-## ⬇️ 下载使用
+使用新 tag 发布，不要覆盖已有 tag。也可以在 Actions 中手动运行；手动构建只上传 Actions artifact，不创建 Release。
 
-- 前往 [BiliRoamingX-PreBuilds Release](https://github.com/BiliRoamingX/BiliRoamingX-PreBuilds/releases/latest) 下载
-- 参照 [revanced-cli](https://github.com/ReVanced/revanced-cli/tree/main/docs) 文档打包
-  1. 下载定制版 [revanced-cli.jar](https://github.com/zjns/revanced-cli/releases/latest)
-  2. 从 [releases](https://github.com/BiliRoamingX/BiliRoamingX/releases/latest) 下载 `integrations.apk` 和 `patches.jar`
-  3. 执行终端命令 `java -jar revanced-cli.jar patch --merge integrations.apk --patch-bundle patches.jar --signing-levels 1,2,3 bilibili.apk`
+自动化需要以下仓库 Actions secrets（本仓库已配置）：
 
-## ⭐ Star History
+| Secret | 内容 |
+| --- | --- |
+| `APK_KEYSTORE_BASE64` | PKCS12/JKS 签名文件的 Base64 |
+| `APK_KEYSTORE_PASSWORD` | 签名文件密码 |
+| `APK_KEY_ALIAS` | 签名别名 |
+| `APK_KEY_PASSWORD` | 私钥密码 |
 
-[![Star History Chart](https://api.star-history.com/svg?repos=BiliRoamingX/BiliRoamingX&type=Timeline)](https://star-history.com/#BiliRoamingX/BiliRoamingX&Timeline)
+签名证书 SHA-256 固定为 `15c915cf551ebfa7154d6bf3ff829345366a7e59011eee105bfe7901c68b0959`。密钥和密码不会放入 Git、构建附件或日志。另行 fork 本仓库时必须使用自己的密钥并修改 `release_signer_sha256`，不能使用这个仓库的证书指纹冒充已有签名。
 
-## 📃 Licence
+## 更新客户端版本
 
-[![GitHub](https://img.shields.io/github/license/BiliRoamingX/BiliRoamingX?style=for-the-badge)](https://github.com/BiliRoamingX/BiliRoamingX/blob/main/LICENSE)
+`release-config.json` 固定官方客户端版本、SHA-256、官方证书及定制 CLI 版本。官方最新下载入口一旦换包，校验会失败；**不会把未适配的新包当成成功发布**。
 
-<div align="right">
-<table><td>
-<a href="#start-of-content">👆 回到顶部</a>
-</td></table>
-</div>
+更新时需要检查官方包的版本与证书，修改指纹及集成代码，重新执行补丁和设备验证，最后更新配置与兼容性记录再打 tag。打 tag 本身不能自动完成对未来客户端的逆向适配。
+
+补丁工具有“个别补丁失败仍退出 0”的行为，本项目额外检查完整日志。任何未声明排除的补丁失败、核心网络入口缺失、源包变化、签名变化都会中止发布。
+
+## 本地构建
+
+需要 JDK 17、Python 3.11+、Android SDK 35 / Build Tools 35.0.0、NDK 26.3.11579264、CMake 3.22.1。Windows 请放在纯英文路径中构建。
+
+```sh
+git clone --recurse-submodules https://github.com/another-sys/BiliRoamingX.git
+cd BiliRoamingX
+python scripts/release.py tools
+python -m unittest discover -s scripts/tests -v
+./gradlew dist
+python scripts/release.py source
+python scripts/release.py patch
+```
+
+设置 `ANDROID_HOME`，Windows 使用 `gradlew.bat`。最终签名构建还需设置 `APK_KEYSTORE_PATH`、`APK_KEYSTORE_PASSWORD`、`APK_KEY_ALIAS`、`APK_KEY_PASSWORD`，然后执行 `python scripts/release.py release`。结果写入 `dist/`；发布前要求此目录为空，避免混入旧产物。
+
+定制 CLI 从原作者的 [v4.6.0.2 Release](https://github.com/zjns/revanced-cli/releases/tag/v4.6.0.2) 下载并校验。构建使用其中的兼容 patcher API，不再依赖已无法匿名访问的旧 GitHub Maven registry。
+
+## 来源与许可
+
+原项目源码基线：`ae58109f3acdd53ec2d2b3fb439c2a2ef1886221`（2024-09-24）。本仓库保留原历史和作者信息。模块及补丁使用 [GPL-3.0](LICENSE)；哔哩哔哩客户端属于其原作者，本仓库的许可不改变其权利归属。

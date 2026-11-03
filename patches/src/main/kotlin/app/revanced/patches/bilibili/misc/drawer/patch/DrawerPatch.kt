@@ -64,11 +64,10 @@ object DrawerPatch : BytecodePatch(
             context.findClass("Lapp/revanced/bilibili/patches/drawer/DrawerLayoutEx\$LayoutParamsEx;")!!
         val result = DrawerLayoutParamsFingerprint.result
             ?: throw DrawerLayoutParamsFingerprint.exception
-        val gravityField = result.mutableClass.fields.first {
-            it.type == "I" && it.accessFlags.isPublic()
-        }
-        val openStateField = result.mutableClass.fields.first {
-            it.type == "I" && it.accessFlags == 0
+        val gravityField = result.mutableClass.fields.firstOrNull { it.name == "gravity" }
+            ?: result.mutableClass.fields.first { it.type == "I" && it.accessFlags.isPublic() }
+        val openStateField = result.mutableClass.fields.single {
+            it.type == "I" && it.name != gravityField.name
         }.also { it.accessFlags = it.accessFlags.toPublic() }
         layoutParamsExClass.mutableClass.setSuperClass(gravityField.definingClass)
         layoutParamsExClass.mutableClass.methods.run {
@@ -97,9 +96,9 @@ object DrawerPatch : BytecodePatch(
                 val insertIdx = implementation!!.instructions.size - 1
                 addInstructions(
                     insertIdx, """
-                    invoke-virtual {p0}, Landroidx/fragment/app/Fragment;->getView()Landroid/view/View;
+                    invoke-virtual/range {p0 .. p0}, Landroidx/fragment/app/Fragment;->getView()Landroid/view/View;
                     move-result-object p1
-                    invoke-static {p1}, Lapp/revanced/bilibili/patches/drawer/DrawerPatch;->onMainFrameFragmentViewCreated(Landroid/view/View;)V
+                    invoke-static/range {p1 .. p1}, Lapp/revanced/bilibili/patches/drawer/DrawerPatch;->onMainFrameFragmentViewCreated(Landroid/view/View;)V
                 """.trimIndent()
                 )
             } ?: throw PatchException("can not found BaseMainFrameFragment")

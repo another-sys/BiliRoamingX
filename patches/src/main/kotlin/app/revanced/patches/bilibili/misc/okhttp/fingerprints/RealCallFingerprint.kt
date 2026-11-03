@@ -13,7 +13,9 @@ object RealCallFingerprint : MethodFingerprint(
         Opcode.INVOKE_VIRTUAL,
         Opcode.MOVE_RESULT_OBJECT,
     ),
-    customFingerprint = { methodDef, _ ->
-        methodDef.returnType == ResponseFingerprint.result!!.classDef.type
+    customFingerprint = { methodDef, classDef ->
+        // The APK also bundles other HTTP implementations with identical strings.
+        methodDef.returnType == "Lokhttp3/Response;" &&
+                classDef.fields.any { it.type == "Lokhttp3/Request;" }
     }
 )

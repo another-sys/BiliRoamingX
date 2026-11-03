@@ -1,0 +1,28 @@
+{
+  "cli": {
+    "version": "4.6.0.2",
+    "url": "https://github.com/zjns/revanced-cli/releases/download/v4.6.0.2/revanced-cli.jar",
+    "sha256": "f2e396c9e631334098daf10e2c31525158180a4887ee99d37192110ffad171a0"
+  },
+  "client": {
+    "url": "https://dl.hdslb.com/mobile/latest/android64/iBiliPlayer-bili.apk",
+    "package": "tv.danmaku.bili",
+    "version": "9.17.0",
+    "version_code": "9170300",
+    "sha256": "5c4cda22b7d8cf2b9a56d2f175b80402fc07fbdb726f1cab0893cd5820bea3a7",
+    "signer_sha256": "93ba270f5521139ecafe4bb638ac5b1198bc548f62d9fd8f8580a079faf5910e"
+  },
+  "excluded_patches": [
+    "Cache redirect",
+    "Copy enhance",
+    "Custom theme color",
+    "Dark switch",
+    "Long press playback speed",
+    "Player gesture detector hook",
+    "Prevent pre download module",
+    "Remember playback speed",
+    "Subtitle import and save",
+    "Trial quality"
+  ],
+  "release_signer_sha256": "15c915cf551ebfa7154d6bf3ff829345366a7e59011eee105bfe7901c68b0959"
+}

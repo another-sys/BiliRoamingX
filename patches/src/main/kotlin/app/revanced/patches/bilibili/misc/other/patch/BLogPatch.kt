@@ -21,8 +21,10 @@ import app.revanced.util.exception
 object BLogPatch : BytecodePatch(setOf(LogcatAdapterFingerprint)) {
     override fun execute(context: BytecodeContext) {
         LogcatAdapterFingerprint.result?.mutableClass?.methods?.run {
-            val origMethod = first { it.returnType == "Z" && it.parameterTypes == listOf("I", "Ljava/lang/String;") }
-            origMethod.cloneMutable(registerCount = 4, clearImplementation = true).apply {
+            val origMethod = first { it.returnType == "Z" &&
+                    (it.parameterTypes == listOf("I") || it.parameterTypes == listOf("I", "Ljava/lang/String;")) }
+            val registers = (0..origMethod.parameterTypes.size).joinToString { "p$it" }
+            origMethod.cloneMutable(registerCount = origMethod.parameterTypes.size + 2, clearImplementation = true).apply {
                 origMethod.name += "_Origin"
                 addInstructionsWithLabels(
                     0, """
@@ -31,7 +33,7 @@ object BLogPatch : BytecodePatch(setOf(LogcatAdapterFingerprint)) {
                     if-eqz v0, :jump
                     goto :return
                     :jump
-                    invoke-virtual {p0, p1, p2}, $origMethod
+                    invoke-virtual {$registers}, $origMethod
                     move-result v0
                     :return
                     return v0

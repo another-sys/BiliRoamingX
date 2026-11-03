@@ -36,6 +36,7 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Build with gradle
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: ./gradlew --no-daemon -Dorg.gradle.jvmargs=-Xmx2g dist
+        run: |
+          python3 scripts/release.py tools
+          python3 -m unittest discover -s scripts/tests -v
+          ./gradlew --no-daemon -Dorg.gradle.jvmargs=-Xmx2g dist

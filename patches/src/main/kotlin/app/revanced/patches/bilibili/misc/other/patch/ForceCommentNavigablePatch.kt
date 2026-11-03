@@ -12,9 +12,11 @@ import app.revanced.patcher.patch.annotation.Patch
 import app.revanced.patches.bilibili.misc.other.fingerprints.CommentConfigFingerprint
 import app.revanced.patches.bilibili.utils.classDescriptor
 import app.revanced.patches.bilibili.utils.isAbstract
+import app.revanced.patches.bilibili.utils.proxy
 import app.revanced.util.getReference
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.reference.FieldReference
+import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 
 @Patch(
     name = "Force comment time navigable",
@@ -45,22 +47,25 @@ object ForceCommentNavigablePatch : BytecodePatch(fingerprints = setOf(CommentCo
                     inst.getReference<FieldReference>()
                 } else null
             }
-            mutableClass.methods.first { m ->
-                m.parameterTypes.isEmpty() && m.returnType == "Z" && !m.accessFlags.isAbstract()
-                        && m.getInstruction(0).let {
-                    if (it.opcode == Opcode.IGET_BOOLEAN) it.getReference<FieldReference>() else null
-                } == seekEnabledField
-            }.addInstructionsWithLabels(
-                0, """
-                invoke-static {}, $patchType->enabled()Z
-                move-result v0
-                if-eqz v0, :jump
-                const/4 v0, 0x1
-                return v0
-                :jump
-                nop
-            """.trimIndent()
-            )
+            // The getter is inlined by R8 in 9.x. Hook actual field reads, keeping
+            // the original value when the setting is off, without extra registers.
+            context.classes.forEach { clazz ->
+                clazz.methods.forEach { method ->
+                    val reads = method.implementation?.instructions?.withIndex()?.filter { (_, inst) ->
+                        inst.opcode == Opcode.IGET_BOOLEAN && inst.getReference<FieldReference>() == seekEnabledField
+                    }.orEmpty()
+                    if (reads.isNotEmpty()) {
+                        val target = clazz.proxy(context).methods.first { it == method }
+                        reads.reversed().forEach { (index, inst) ->
+                            val register = (inst as OneRegisterInstruction).registerA
+                            target.addInstructions(index + 1, """
+                                invoke-static/range {v$register .. v$register}, $patchType->seekEnabled(Z)Z
+                                move-result v$register
+                            """.trimIndent())
+                        }
+                    }
+                }
+            }
         }
     }
 }

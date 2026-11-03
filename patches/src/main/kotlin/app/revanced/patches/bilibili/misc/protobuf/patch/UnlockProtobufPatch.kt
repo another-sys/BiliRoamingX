@@ -9,6 +9,8 @@ import app.revanced.patcher.util.proxy.mutableTypes.MutableMethod
 import app.revanced.patches.bilibili.utils.*
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.builder.instruction.BuilderInstruction35c
+import com.android.tools.smali.dexlib2.builder.instruction.BuilderInstruction3rc
+import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
 
 @Patch(
     name = "Unlock ProtoBuf",
@@ -22,26 +24,43 @@ import com.android.tools.smali.dexlib2.builder.instruction.BuilderInstruction35c
 object UnlockProtobufPatch : BytecodePatch() {
     override fun execute(context: BytecodeContext) {
         val methodNameRegex = Regex("""^((set|add|remove|clear|merge|getMutable)\w+)|<init>$""")
+        val promoted = mutableSetOf<String>()
         context.classes.filter { it.superclass == "Lcom/google/protobuf/GeneratedMessageLite;" }
             .flatMap { it.proxy(context).methods }.forEach { m ->
                 // step 1, private to public
                 if (m.accessFlags.isPrivate()
                     && !m.accessFlags.isStatic()
                     && m.name.matches(methodNameRegex)
-                ) m.accessFlags = m.accessFlags.toPublic()
-                else if (m.accessFlags.isSynthetic() && m.returnType.let { it == "V" || it == "Ljava/util/Map;" }) {
-                    val inst = m.implementation!!.instructions[0]
-                    // step 2, invoke-direct to invoke-virtual
-                    if (inst.opcode == Opcode.INVOKE_DIRECT) {
-                        val args = (inst as BuilderInstruction35c).args()
-                        m.replaceInstruction(
-                            0, """
-                                invoke-virtual {$args}, ${inst.reference}
-                            """.trimIndent()
+                ) {
+                    m.accessFlags = m.accessFlags.toPublic()
+                    // Constructors must continue to use invoke-direct.
+                    if (m.name != "<init>") promoted.add(m.toString())
+                }
+            }
+        // R8 now moves calls into builders and ordinary helper methods. Updating
+        // only the first instruction of synthetic methods causes ICCE at startup.
+        context.classes.forEach { clazz ->
+            clazz.methods.filter { method ->
+                method.implementation?.instructions?.any { inst ->
+                    (inst.opcode == Opcode.INVOKE_DIRECT || inst.opcode == Opcode.INVOKE_DIRECT_RANGE) &&
+                            (inst as ReferenceInstruction).reference.toString() in promoted
+                } == true
+            }.forEach { original ->
+                val method = clazz.proxy(context).methods.first { it == original }
+                method.implementation!!.instructions.toList().forEachIndexed { index, inst ->
+                    when {
+                        inst is BuilderInstruction35c && inst.opcode == Opcode.INVOKE_DIRECT &&
+                                inst.reference.toString() in promoted -> method.replaceInstruction(
+                            index, "invoke-virtual {${inst.args()}}, ${inst.reference}"
+                        )
+                        inst is BuilderInstruction3rc && inst.opcode == Opcode.INVOKE_DIRECT_RANGE &&
+                                inst.reference.toString() in promoted -> method.replaceInstruction(
+                            index, "invoke-virtual/range {v${inst.startRegister} .. v${inst.startRegister + inst.registerCount - 1}}, ${inst.reference}"
                         )
                     }
                 }
             }
+        }
         // add back XXX method copy from executeXXX method
         context.classes.filter {
             it.type.startsWith("Lcom/bapis") && it.type.endsWith("Moss;")

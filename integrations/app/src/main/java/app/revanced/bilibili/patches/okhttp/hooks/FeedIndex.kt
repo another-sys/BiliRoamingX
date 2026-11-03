@@ -9,7 +9,9 @@ import app.revanced.bilibili.utils.toJSONObject
 object FeedIndex : ApiHook() {
     // 尊重官方，不强制关闭AB实验
     private val newPegasusEnabled by lazy {
-        Utils.getAb("ff_key_use_new_pegasus", false)
+        // KMP FeedItem is no longer controlled by the old AB flag in 9.x.
+        runCatching { Class.forName("com.bilibili.bilifeed.card.FeedItem") }.isSuccess ||
+                Utils.getAb("ff_key_use_new_pegasus", false)
     }
 
     override fun shouldHook(url: String, status: Int): Boolean {

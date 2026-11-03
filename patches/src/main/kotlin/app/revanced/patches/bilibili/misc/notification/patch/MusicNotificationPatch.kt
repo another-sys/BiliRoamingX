@@ -55,7 +55,7 @@ object MusicNotificationPatch : BytecodePatch(
             :jump
             nop
         """.trimIndent()
-        ) ?: throw NotificationStyleAbFingerprint.exception
+        ) // New clients enable system media controls unconditionally (AB flag removed).
 
         val onCreateNotificationMethod = patchClass.methods.first { it.name == "onCreateNotification" }
         arrayOf(

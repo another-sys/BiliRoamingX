@@ -3,7 +3,10 @@ package app.revanced.patches.bilibili.misc.protobuf.patch
 import app.revanced.patcher.data.BytecodeContext
 import app.revanced.patcher.extensions.InstructionExtensions.addInstructions
 import app.revanced.patcher.extensions.InstructionExtensions.addInstructionsWithLabels
-import app.revanced.patcher.extensions.InstructionExtensions.removeInstructions
+import app.revanced.patches.bilibili.utils.cloneMutable
+import app.revanced.util.getReference
+import com.android.tools.smali.dexlib2.iface.reference.MethodReference
+import app.revanced.patches.bilibili.misc.protobuf.fingerprints.MossOkHttpInterceptorFingerprint
 import app.revanced.patcher.patch.BytecodePatch
 import app.revanced.patcher.patch.PatchException
 import app.revanced.patcher.patch.annotation.CompatiblePackage
@@ -23,70 +26,51 @@ import com.android.tools.smali.dexlib2.iface.instruction.formats.Instruction35c
         CompatiblePackage(name = "com.bilibili.app.in")
     ]
 )
-object MossPatch : BytecodePatch(setOf(MossServiceFingerprint, MossMiddlewareGaiaFingerprint)) {
+object MossPatch : BytecodePatch(setOf(MossServiceFingerprint, MossMiddlewareGaiaFingerprint, MossOkHttpInterceptorFingerprint)) {
     override fun execute(context: BytecodeContext) {
         MossServiceFingerprint.result?.mutableClass?.methods?.let { methods ->
             methods.find { it.name == "blockingUnaryCall" }?.run {
-                val implementation = implementation ?: return@run
-                addInstructionsWithLabels(
-                    0, """
+                // Wrap the complete implementation: newer engines return from several
+                // branches, so replacing only the last invoke loses response hooks.
+                val original = this
+                val wrapper = cloneMutable(registerCount = 7, clearImplementation = true)
+                original.name += "_Origin"
+                wrapper.addInstructionsWithLabels(0, """
                     invoke-static {p2}, Lapp/revanced/bilibili/patches/protobuf/MossPatch;->hookBlockingBefore(Lcom/google/protobuf/GeneratedMessageLite;)Ljava/lang/Object;
                     move-result-object v0
-                    if-eqz v0, :jump
+                    if-eqz v0, :proceed
                     sget-object v1, Lapp/revanced/bilibili/meta/HookFlags;->STOP_EXECUTION:Ljava/lang/Object;
-                    if-eq v0, v1, :stop_execution
-                    goto :modify_result
-                    :stop_execution
+                    if-ne v0, v1, :custom
                     const/4 v0, 0x0
                     return-object v0
-                    :modify_result
+                    :custom
                     check-cast v0, Lcom/google/protobuf/GeneratedMessageLite;
                     return-object v0
-                    :jump
-                    nop
-                """.trimIndent()
-                )
-                val invokeInst = implementation.instructions.findLast {
-                    it.opcode == Opcode.INVOKE_INTERFACE
-                } as Instruction35c
-                removeInstructions(implementation.instructions.size - 3, 3)
-                addInstructionsWithLabels(
-                    implementation.instructions.size,
-                    """
+                    :proceed
                     const/4 v1, 0x0
                     const/4 v2, 0x0
-                    #:try_start
-                    invoke-interface {v0, p1, p2, p3}, ${invokeInst.reference}
-                    move-result-object p1
-                    #:try_end
-                    #.catch Lcom/bilibili/lib/moss/api/MossException; {:try_start .. :try_end} :catch
-                    move-object v1, p1
-                    goto :modify_result
-
-                    #:catch
-                    move-exception p1
-                    move-object v2, p1
-
-                    :modify_result
+                    invoke-virtual {p0, p1, p2, p3}, $original
+                    move-result-object v1
+                    goto :after
+                    move-exception v2
+                    :after
                     invoke-static {p2, v1, v2}, Lapp/revanced/bilibili/patches/protobuf/MossPatch;->hookBlockingAfter(Lcom/google/protobuf/GeneratedMessageLite;Lcom/google/protobuf/GeneratedMessageLite;Lcom/bilibili/lib/moss/api/MossException;)Lcom/google/protobuf/GeneratedMessageLite;
-
-                    move-result-object p1
-                    return-object p1
-                """.trimIndent()
-                )
-                val invokeIndex = implementation.instructions.indexOfLast {
-                    it.opcode == Opcode.INVOKE_INTERFACE
+                    move-result-object v0
+                    return-object v0
+                """.trimIndent())
+                val impl = wrapper.implementation!!
+                val invokeIndex = impl.instructions.indexOfFirst {
+                    it.opcode == Opcode.INVOKE_VIRTUAL && it.getReference<MethodReference>()?.name == original.name
                 }
-                val moveExceptionIndex = implementation.instructions.indexOfLast {
-                    it.opcode == Opcode.MOVE_EXCEPTION
-                }
-                implementation.addCatch(
+                val catchIndex = impl.instructions.indexOfFirst { it.opcode == Opcode.MOVE_EXCEPTION }
+                impl.addCatch(
                     "Lcom/bilibili/lib/moss/api/MossException;",
-                    implementation.newLabelForIndex(invokeIndex),
-                    implementation.newLabelForIndex(invokeIndex + 2),
-                    implementation.newLabelForIndex(moveExceptionIndex)
+                    impl.newLabelForIndex(invokeIndex),
+                    impl.newLabelForIndex(invokeIndex + 2),
+                    impl.newLabelForIndex(catchIndex)
                 )
-            }
+                methods.add(wrapper)
+            } ?: throw PatchException("Missing Moss blockingUnaryCall")
             val gainType = MossMiddlewareGaiaFingerprint.result?.classDef?.type
             methods.filter { it.name == "asyncUnaryCall" || it.name == "asyncServerStreamingCall" }.forEach {
                 it.addInstructionsWithLabels(
@@ -116,21 +100,18 @@ object MossPatch : BytecodePatch(setOf(MossServiceFingerprint, MossMiddlewareGai
                 )
             }
         } ?: throw MossServiceFingerprint.exception
-        context.findClass("Lorg/chromium/net/impl/BidirectionalStreamBuilderImpl;")?.mutableClass?.run {
-            val urlField = fields.first { it.name == "mUrl" }
-            val requestHeadersField = fields.first { it.name == "mRequestHeaders" }
-            methods.first {
-                it.returnType == "Lorg/chromium/net/ExperimentalBidirectionalStream;" && it.parameterTypes.isEmpty()
-            }.addInstructions(
-                0,
-                """
-                iget-object v0, p0, $urlField
-                iget-object v1, p0, $requestHeadersField
-                invoke-static {v0, v1}, Lapp/revanced/bilibili/patches/protobuf/MossPatch;->hookBeforeRequest(Ljava/lang/String;Ljava/util/ArrayList;)Ljava/lang/String;
-                move-result-object v0
-                iput-object v0, p0, $urlField
-            """.trimIndent()
-            )
-        } ?: throw PatchException("not found BidirectionalStreamBuilderImpl class")
+        val interceptor = MossOkHttpInterceptorFingerprint.result?.mutableMethod
+            ?: throw MossOkHttpInterceptorFingerprint.exception
+        val instructions = interceptor.implementation!!.instructions
+        val index = instructions.indexOfFirst {
+            it.opcode == Opcode.INVOKE_INTERFACE && it.getReference<MethodReference>()?.toString() ==
+                    "Lokhttp3/Interceptor\$Chain;->proceed(Lokhttp3/Request;)Lokhttp3/Response;"
+        }
+        if (index < 0) throw PatchException("Missing Moss OkHttp proceed call")
+        val request = (instructions[index] as Instruction35c).registerD
+        interceptor.addInstructions(index, """
+            invoke-static {v$request}, Lapp/revanced/bilibili/patches/protobuf/MossPatch;->hookBeforeRequestOkHttp(Lokhttp3/Request;)Lokhttp3/Request;
+            move-result-object v$request
+        """.trimIndent())
     }
 }

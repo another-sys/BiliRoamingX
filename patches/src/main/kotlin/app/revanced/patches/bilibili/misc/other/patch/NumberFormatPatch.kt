@@ -9,6 +9,7 @@ import app.revanced.patches.bilibili.misc.other.fingerprints.MineBindAccountStat
 import app.revanced.patches.bilibili.misc.other.fingerprints.SpaceBindAccountStateFingerprint
 import app.revanced.patches.bilibili.utils.cloneMutable
 import app.revanced.patches.bilibili.utils.toClassDef
+import app.revanced.patches.bilibili.utils.isPrivate
 import app.revanced.util.exception
 
 @Patch(
@@ -32,7 +33,7 @@ object NumberFormatPatch : BytecodePatch(
                 mutableMethod.name += "_Origin"
                 addInstructions(
                     """
-                    invoke-direct {p0, p1, p2}, $mutableMethod
+                    ${if (mutableMethod.accessFlags.isPrivate()) "invoke-direct" else "invoke-virtual"} {p0, p1, p2}, $mutableMethod
                     invoke-static {p0, p1}, $mineBindMethod
                     return-void
                 """.trimIndent()
@@ -44,7 +45,7 @@ object NumberFormatPatch : BytecodePatch(
                 mutableMethod.name += "_Origin"
                 addInstructions(
                     """
-                    invoke-direct {p0, p1}, $mutableMethod
+                    ${if (mutableMethod.accessFlags.isPrivate()) "invoke-direct" else "invoke-virtual"} {p0, p1}, $mutableMethod
                     invoke-static {p0, p1}, $spaceBindMethod
                     return-void
                 """.trimIndent()
