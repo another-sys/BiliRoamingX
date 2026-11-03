@@ -202,7 +202,7 @@ object FeedIndex : ApiHook() {
             config.optInt(rowKey) in 0 until LOAD_MORE_ROWS) {
             config.put(rowKey, LOAD_MORE_ROWS)
         }
-        return config?.optInt("no_preload") != 1 && (config?.optInt(rowKey) ?: 0) >= 0
+        return (config?.optInt("no_preload") ?: 0) == 0 && (config?.optInt(rowKey) ?: 0) >= 0
     }
 
     private fun fillPage(uri: Uri, data: JSONObject, firstCursor: Long?, ticket: FeedWindow.Ticket?) {

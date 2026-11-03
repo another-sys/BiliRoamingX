@@ -92,7 +92,7 @@ internal object FeedWindow {
         }
         finishRequest()
         if (page.preload) prime(ticket, old.base, idx!!, page.visibleTail, page.tail, page.span)
-        Logger.info { "Home feed cache: hit uniqueVideos=${page.ids.size} pages=${page.count} waitMs=${SystemClock.elapsedRealtime()-started} ready=$ready" }
+        Logger.info { "Home feed cache: hit uniqueVideos=${page.ids.size} pages=${page.count} waitMs=${SystemClock.elapsedRealtime() - started} ready=$ready" }
         return page.json
     }
 
@@ -106,7 +106,7 @@ internal object FeedWindow {
                 val page = try { prepare(job) }
                 catch (_: InterruptedException) { Thread.currentThread().interrupt(); null }
                 catch (e: Exception) { Logger.warn { "Feed cache preparation stopped (${e.javaClass.simpleName})" }; null }
-
+                catch (e: LinkageError) { Logger.warn { "Feed cache model unavailable (${e.javaClass.simpleName})" }; null }
                 job.result.complete(page)
             }
         }
@@ -126,11 +126,11 @@ internal object FeedWindow {
         fun fetch(at: Long) = if (job.active() && isWifiConnected() && Accounts.mid == job.owner.account)
             FeedIndex.nextEnvelope(job.base, query, at, TIMEOUT_MS) else null
         // Only the coordinator merges/filters. Requests can finish in any order.
-        while (job.active() && pages < MAX_PAGES && empty < 3 && ids.size < FeedIndex.MIN_VIDEOS) {
+        batch@ while (job.active() && pages < MAX_PAGES && empty < 3 && ids.size < FeedIndex.MIN_VIDEOS) {
             val predicted = HashMap<Long, Future<JSONObject?>>()
             var predictedCursor = cursor
             try {
-                for (n in 1..minOf(2, MAX_PAGES-pages-1)) {
+                for (n in 1..minOf(2, MAX_PAGES - pages - 1)) {
                     if (span !in 1 until predictedCursor) break
                     predictedCursor -= span
                     val at = predictedCursor
@@ -139,12 +139,13 @@ internal object FeedWindow {
                 }
                 do {
                     val start = cursor
-                    val raw = predicted.remove(start)?.get() ?: fetch(start) ?: return null
+                    val future = predicted.remove(start)
+                    val raw = (if (future == null) fetch(start) else future.get()) ?: break@batch
                     if (!job.active()) return null
-                    val d = raw.optJSONObject("data") ?: return null
-                    val cards = d.optJSONArray("items") ?: return null
-                    val next = cards.lastCursor() ?: return null
-                    if (next !in 1 until start) return null
+                    val d = raw.optJSONObject("data") ?: break@batch
+                    val cards = d.optJSONArray("items") ?: break@batch
+                    val next = cards.lastCursor() ?: break@batch
+                    if (next !in 1 until start) break@batch
                     span = start - next
                     cursor = next
                     PegasusPatch.pegasusHook(d)
