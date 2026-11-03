@@ -2,6 +2,8 @@ package app.revanced.patches.bilibili.misc.other.patch
 
 import app.revanced.patcher.data.BytecodeContext
 import app.revanced.patcher.extensions.InstructionExtensions.addInstructions
+import app.revanced.patcher.extensions.InstructionExtensions.replaceInstruction
+import app.revanced.patcher.fingerprint.MethodFingerprint
 import app.revanced.patcher.patch.BytecodePatch
 import app.revanced.patcher.patch.annotation.CompatiblePackage
 import app.revanced.patcher.patch.annotation.Patch
@@ -12,6 +14,14 @@ import app.revanced.patches.bilibili.utils.isPublic
 import app.revanced.patches.bilibili.utils.isStatic
 import app.revanced.util.exception
 
+import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
+import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
+
+private object VideoDetailPreloadFingerprint : MethodFingerprint(
+    strings = listOf("player_preload", "parser preload data to json obj error", "VideoDetailIntentParser"),
+    customFingerprint = { method, _ -> method.name == "<init>" }
+)
+
 @Patch(
     name = "BL route intercept",
     description = "哔哩哔哩页面路由修改",
@@ -21,7 +31,7 @@ import app.revanced.util.exception
         CompatiblePackage(name = "com.bilibili.app.in")
     ]
 )
-object BLRoutePatch : BytecodePatch(setOf(BLRouteBuilderFingerprint, RouteRequestFingerprint)) {
+object BLRoutePatch : BytecodePatch(setOf(BLRouteBuilderFingerprint, RouteRequestFingerprint, VideoDetailPreloadFingerprint)) {
     override fun execute(context: BytecodeContext) {
         BLRouteBuilderFingerprint.result?.mutableClass?.methods?.find { m ->
             m.name == "<init>" && m.parameterTypes.let { it.size == 1 && it[0] == "Landroid/net/Uri;" }
@@ -40,6 +50,16 @@ object BLRoutePatch : BytecodePatch(setOf(BLRouteBuilderFingerprint, RouteReques
             move-result-object p1
         """.trimIndent()
         ) ?: throw RouteRequestFingerprint.exception
+        VideoDetailPreloadFingerprint.result?.run {
+            val index = scanResult.stringsScanResult!!.matches.first { it.string == "player_preload" }.index + 1
+            val call = mutableMethod.implementation!!.instructions[index]
+            if (call is FiveRegisterInstruction && (call as? ReferenceInstruction)?.reference.toString() ==
+                "Landroid/os/Bundle;->getString(Ljava/lang/String;)Ljava/lang/String;") {
+                mutableMethod.replaceInstruction(index,
+                    "invoke-static {v${call.registerC}, v${call.registerD}}, " +
+                            "Lapp/revanced/bilibili/patches/BLRoutePatch;->videoDetailPreload(Landroid/os/Bundle;Ljava/lang/String;)Ljava/lang/String;")
+            }
+        }
         val routeToMethod = context.classes.asSequence().flatMap { it.methods }.first { m ->
             m.accessFlags.let { it.isStatic() && it.isPublic() }
                     && m.parameterTypes == listOf(

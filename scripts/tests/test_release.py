@@ -11,7 +11,8 @@ spec.loader.exec_module(release)
 
 class ReleaseGuards(unittest.TestCase):
     SUCCESS = "\n".join(f"INFO: {name} succeeded" for name in (
-        "Integrations", "BiliRoamingX settings entrance", "Moss", "OkHttp", "Config", "Pegasus hook", "Commercial promotion filters")) + "\n"
+        "Integrations", "BiliRoamingX settings entrance", "Moss", "OkHttp", "Config",
+        "Pegasus hook", "Commercial promotion filters", "Keep trailing home feed card")) + "\n"
 
     def test_reject_partial_success_even_when_cli_exits_zero(self):
         with self.assertRaises(RuntimeError):

@@ -1,9 +1,11 @@
 package app.revanced.bilibili.patches
 
 import android.net.Uri
+import android.os.Bundle
 import androidx.annotation.Keep
 import app.revanced.bilibili.settings.Settings
 import app.revanced.bilibili.utils.Logger
+import app.revanced.bilibili.utils.Versions
 import com.bapis.bilibili.app.view.v1.Relate
 import com.bapis.bilibili.app.viewunite.common.RelateCard
 import com.bapis.bilibili.app.viewunite.common.RelateCardType
@@ -14,6 +16,17 @@ object BLRoutePatch {
     private val playerPreloadRegex = Regex("&player_preload=[^&]*")
     private val globalBgmUrlRegex =
         Regex("""^https?://www\.(?:bilibili\.tv|biliintl\.com)/\w+/play/(?<sid>\d+)(?:/(?<epId>\d+)?)?.*""")
+
+    @Keep
+    @JvmStatic
+    fun videoDetailPreload(args: Bundle, key: String): String? {
+        val preload = args.getString(key) ?: return null
+        // The 9.17 history and home preload can start the video without resolving its danmaku.
+        return when (args.getString("from_spmid")) {
+            "main.my-history.0.0", "tm.recommend.0.0" -> if (Versions.ge9_17_0()) null else preload
+            else -> preload
+        }
+    }
 
     private fun needRemovePayload(): Boolean {
         return VideoQualityPatch.halfScreenQuality() != 0 || VideoQualityPatch.getMatchedFullScreenQuality() != 0 || Settings.DefaultPlaybackSpeed() != 0f
