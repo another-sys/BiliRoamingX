@@ -233,7 +233,7 @@ object FeedIndex : ApiHook() {
             var cursor = firstCursor
             val cursors = HashSet<Long>()
             if (loadMore) uri.getQueryParameter("idx")?.toLongOrNull()?.let(cursors::add)
-            val deadline = SystemClock.elapsedRealtime() + REFILL_BUDGET_MS
+            var deadline = SystemClock.elapsedRealtime() + REFILL_BUDGET_MS
             while (ids.size < MIN_VIDEOS && emptyPages < MAX_EMPTY_PAGES && cursor != null && cursors.add(cursor)) {
                 val timeLeft = deadline - SystemClock.elapsedRealtime()
                 if (timeLeft < 300) break
@@ -268,6 +268,9 @@ object FeedIndex : ApiHook() {
                     break
                 }
                 emptyPages = if (ids.size == before) emptyPages + 1 else 0
+                // A sparse scrolling feed may need several successful requests to reach ten videos.
+                if (loadMore && ids.size > before && ids.size < MIN_VIDEOS)
+                    deadline = SystemClock.elapsedRealtime() + REFILL_BUDGET_MS
             }
         }
         Logger.info {
