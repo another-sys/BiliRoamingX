@@ -2,6 +2,7 @@ package app.revanced.bilibili.patches.okhttp.hooks
 
 import app.revanced.bilibili.patches.json.PegasusPatch
 import app.revanced.bilibili.patches.okhttp.ApiHook
+import app.revanced.bilibili.utils.Logger
 import app.revanced.bilibili.utils.Utils
 import app.revanced.bilibili.utils.Versions
 import app.revanced.bilibili.utils.toJSONObject
@@ -20,13 +21,18 @@ object FeedIndex : ApiHook() {
     }
 
     override fun hook(url: String, status: Int, request: String, response: String): String {
-        val resp = response.toJSONObject()
-        if (resp.optInt("code", -1) == 0) {
-            val data = resp.optJSONObject("data")
-            if (data != null)
-                PegasusPatch.pegasusHook(data)
-            return resp.toString()
+        return try {
+            val resp = response.toJSONObject()
+            if (resp.optInt("code", -1) != 0) return response
+            val data = resp.optJSONObject("data") ?: return response
+            PegasusPatch.pegasusHook(data)
+            resp.toString()
+        } catch (e: Exception) {
+            Logger.error(e) { "Feed filter failed, preserving the original response" }
+            response
+        } catch (e: LinkageError) {
+            Logger.error(e) { "Feed filter model unavailable, preserving the original response" }
+            response
         }
-        return response
     }
 }

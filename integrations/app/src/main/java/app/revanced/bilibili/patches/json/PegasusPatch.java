@@ -993,7 +993,9 @@ public class PegasusPatch {
         });
         int column = config != null ? config.optInt("column", 2) : 2;
         align(items, column);
-        Jsons.forEach(items, PegasusPatch::appendReasons);
+        // The KMP card click handler does not understand the legacy custom reasons.
+        if (!Versions.atLeast("9.17.0"))
+            Jsons.forEach(items, PegasusPatch::appendReasons);
     }
 
     private static void align(JSONArray items, int column) throws JSONException {

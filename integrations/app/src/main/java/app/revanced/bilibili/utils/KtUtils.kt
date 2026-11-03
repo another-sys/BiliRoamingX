@@ -676,14 +676,21 @@ inline fun <reified T : MessageLite> getDeviceSetting(): T? {
     return getDeviceSetting(T::class.java)
 }
 
+// This optional provider was removed from the 9.17 client manifest.
+private val deviceSettingUri: Uri? by lazy {
+    val context = Utils.getContext()
+    val authority = "${context.packageName}.device.settings.DeviceSettingProvider"
+    context.packageManager.resolveContentProvider(authority, 0)?.let { Uri.parse("content://$authority/call") }
+}
+
 fun <T : MessageLite> getDeviceSetting(typeClass: Class<T>): T? {
     val context = Utils.getContext()
-    val callUri = "content://${context.packageName}.device.settings.DeviceSettingProvider/call"
+    val callUri = deviceSettingUri ?: return null
     val cr = context.contentResolver
     val typeUrl = MessageLiteToStringEx.typeMap.entries.find {
         it.value == typeClass
     }?.key ?: return null
-    val callResult = cr.call(Uri.parse(callUri), "method_call_get_setting", typeUrl, null)
+    val callResult = cr.runCatchingOrNull { call(callUri, "method_call_get_setting", typeUrl, null) }
     val bytes = callResult?.getByteArray(typeUrl) ?: return null
     return bytes.runCatchingOrNull {
         val any = ProtoBufAny.parseFrom(this)
@@ -693,7 +700,7 @@ fun <T : MessageLite> getDeviceSetting(typeClass: Class<T>): T? {
 
 fun setDeviceSetting(message: MessageLite): Boolean {
     val context = Utils.getContext()
-    val callUri = "content://${context.packageName}.device.settings.DeviceSettingProvider/call"
+    val callUri = deviceSettingUri ?: return false
     val cr = context.contentResolver
     val typeClass = message.javaClass
     val typeUrl = MessageLiteToStringEx.typeMap.entries.find {
@@ -702,7 +709,7 @@ fun setDeviceSetting(message: MessageLite): Boolean {
     val any = newAny(typeUrl, message)
     val extras = Bundle().apply { putByteArray(typeUrl, any.toByteArray()) }
     return cr.runCatchingOrNull {
-        call(Uri.parse(callUri), "method_call_set_setting", typeUrl, extras); true
+        call(callUri, "method_call_set_setting", typeUrl, extras); true
     } ?: false
 }
 
