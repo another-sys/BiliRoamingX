@@ -26,7 +26,7 @@ class UpdatePublication(unittest.TestCase):
         (self.directory / 'build-info.json').write_text(json.dumps(dict(
             apk='client.apk', source_dirty=False, source_commit='abc')), encoding='utf-8')
         self.client = Mock()
-        self.client.head_object.side_effect = publisher.oss2.exceptions.NoSuchKey(404, {}, '', {})
+        self.client.head_object.side_effect = publisher.oss2.exceptions.NotFound(404, {}, '', {})
         self.client.get_object.return_value.read.return_value = b'previous envelope'
         decoder = patch.object(publisher, 'decode', side_effect=lambda value:
                                self.update if value == self.envelope else self.current)

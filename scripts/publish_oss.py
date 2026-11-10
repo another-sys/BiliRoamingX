@@ -104,7 +104,7 @@ def public_file_hash(path):
 def existing_matches(client, key, sha256, size):
     try:
         stored = client.head_object(key)
-    except oss2.exceptions.NoSuchKey:
+    except oss2.exceptions.NotFound:
         return False
     if stored.headers.get('x-oss-meta-sha256') != sha256 or stored.content_length != size:
         raise ValueError('Refusing to replace different immutable object: ' + key)
