@@ -35,7 +35,7 @@ def public_hash(url):
 def publish(directory, client):
     envelope = (directory / 'update.json').read_bytes()
     update = decode(envelope)
-    info = json.loads((directory / 'build-info.json').read_text())
+    info = json.loads((directory / 'build-info.json').read_text(encoding='utf-8'))
     if info['source_dirty'] or info['source_commit'] != update['source_commit'] or not update['release'].startswith('v'):
         raise ValueError('Only clean tagged releases may be published')
     name = info['apk']
@@ -90,9 +90,17 @@ def public_file_hash(path):
 def probe(client):
     key = PREFIX + 'checks/' + os.environ.get('GITHUB_RUN_ID', str(time.time_ns())) + '.txt'
     data = b'BiliRoamingX OSS publishing check\n'
-    client.put_object(key, data, headers={'x-oss-object-acl': 'public-read', 'Cache-Control': 'no-store'})
+    headers = {'x-oss-object-acl': 'public-read', 'Cache-Control': 'no-store, no-cache, max-age=0, must-revalidate'}
+    client.put_object(key, data, headers=headers)
     if client.get_object(key).read() != data or public_hash(BASE + key) != hashlib.sha256(data).hexdigest():
         raise ValueError('OSS/CDN round trip failed')
+    # Fetch the exact same URL after an overwrite: query-string cache busting is
+    # deliberately absent so a stale CDN rule cannot hide behind a new cache key.
+    replacement = data + b'Freshness verified\n'
+    client.put_object(key, replacement, headers=headers)
+    if public_hash(BASE + key) != hashlib.sha256(replacement).hexdigest():
+        raise ValueError('CDN cached an outdated no-cache object')
+    print('Verified CDN freshness without query-string cache busting', flush=True)
     # This read-only attempt must be denied; it cannot alter another directory.
     try:
         client.get_object('brx-permission-boundary-check.txt')
