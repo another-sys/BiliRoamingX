@@ -1,0 +1,52 @@
+name: Republish an existing release to OSS
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing signed v* GitHub release to verify and publish
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: biliroamingx-apk-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r scripts/update-requirements.txt
+      - name: Download the original release files
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v[A-Za-z0-9._-]+$ ]] || exit 1
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir dist
+          python - <<'PY'
+          import os, sys
+          from pathlib import Path
+          sys.path.insert(0, 'scripts')
+          from update_protocol import decode
+          assert decode(Path('dist/update.json').read_bytes())['release'] == os.environ['RELEASE_TAG']
+          PY
+      - uses: aliyun/configure-aliyun-credentials-action@1e5248c8d5d93a8781ac344a68e19a43341e79e6 # v1
+        with:
+          role-to-assume: acs:ram::1815570877605552:role/biliroamingx-release
+          oidc-provider-arn: acs:ram::1815570877605552:oidc-provider/github-biliroamingx
+          audience: sts.aliyuncs.com
+          role-session-name: brx-republish-${{ github.run_id }}
+      - run: python scripts/publish_oss.py

@@ -24,6 +24,8 @@
 
 OSS 发布独立于构建任务，使用同一次构建上传的原始附件。网络故障时选择 Actions 的「Re-run failed jobs」只重试发布，不重新生成签名包；这样可以安全继续上传相同版本目录。不要为重试覆盖 tag。
 
+若发布脚本本身需要修复，可在修复后的 `main` 手动运行 `Republish an existing release to OSS` 并填写已有 tag。它下载已有 Release 的原始附件、核验签名和版本，再上传；不重新构建 APK，也不替换 GitHub 附件。该任务与 tag 发布共享串行锁。
+
 ## OSS 配置
 
 - Bucket：`another-oss`；地域：`cn-beijing`；前缀：`biliroamingx/`。
