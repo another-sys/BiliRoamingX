@@ -19,28 +19,30 @@ object RemoveVipSectionPatch {
     @JvmStatic
     private fun processingLayout(view: View?) {
         view ?: return
-        val vipLayout = view.findView<ViewGroup>("mine_vip_layout")
-        val mineRecycle = view.findView<ViewGroup>("mine_recycle")
-        mineRecycle.clipToPadding = false
+        val mineRecycle = view.findView<View?>("mine_recycle") as? ViewGroup
+        mineRecycle?.clipToPadding = false
+        // Newer Mine layouts can omit this legacy VIP container entirely.
+        // Their promotion cards are filtered separately by CommercialNavigation.
+        val vipLayout = view.findView<View?>("mine_vip_layout") as? ViewGroup ?: return
         if (Settings.RemoveVipSection()) {
             vipLayout.children.forEach { it.hide() }
             val currentThemeId = currentThemeId()
             val lastThemeId = lastThemeId()
             val pureThemeIds = CustomThemePatch.getThemeNames().values.map { it.toLong() }
             if (currentThemeId == 8L/*white*/ || (currentThemeId == 1L/*black*/ && (lastThemeId == -1L || lastThemeId in pureThemeIds))) {
-                mineRecycle.updatePadding(top = 0)
+                mineRecycle?.updatePadding(top = 0)
                 vipLayout.updateLayoutParams {
                     height = 0
                 }
             } else {
-                mineRecycle.updatePadding(top = 10.dp)
+                mineRecycle?.updatePadding(top = 10.dp)
                 vipLayout.updateLayoutParams {
                     height = 10.dp
                 }
             }
         } else {
             vipLayout.children.forEach { it.show() }
-            mineRecycle.updatePadding(top = 0)
+            mineRecycle?.updatePadding(top = 0)
             vipLayout.updateLayoutParams {
                 height = ViewGroup.LayoutParams.WRAP_CONTENT
             }
