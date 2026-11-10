@@ -4,9 +4,9 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import subprocess
+import tempfile
 import time
-import urllib.request
-from urllib.parse import urlsplit
 import oss2
 from oss2.credentials import StaticCredentialsProvider
 from update_protocol import decode, require_advancement
@@ -24,13 +24,21 @@ def bucket():
 
 def public_hash(url):
     print('Checking public download ' + url, flush=True)
-    digest = hashlib.sha256()
-    with urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': 'BiliRoamingX-release'}), timeout=60) as response:
-        if not response.url.startswith(BASE):
+    # curl bounds the entire connection phase, including trying multiple CDN
+    # addresses. urllib's per-socket timeout can multiply across DNS answers.
+    with tempfile.TemporaryDirectory(prefix='brx-public-check-') as temporary:
+        target = Path(temporary) / 'download'
+        result = subprocess.run(['curl', '--fail', '--silent', '--show-error', '--location',
+            '--max-redirs', '5', '--proto', '=http,https', '--connect-timeout', '15',
+            '--max-time', '300', '--retry', '2', '--retry-delay', '2', '--retry-max-time', '600',
+            '--max-filesize', str(2 * 1024**3), '--user-agent', 'BiliRoamingX-release',
+            '--output', str(target), '--write-out', '%{url_effective}', url],
+            capture_output=True, text=True, timeout=660)
+        if result.returncode:
+            raise RuntimeError('CDN download failed: ' + result.stderr.strip())
+        if not result.stdout.startswith(BASE):
             raise ValueError('Unexpected public download redirect')
-        for data in iter(lambda: response.read(1024 * 1024), b''):
-            digest.update(data)
-    return digest.hexdigest()
+        return public_file_hash(target)
 
 
 def publish(directory, client):
