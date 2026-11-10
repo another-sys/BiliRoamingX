@@ -27,6 +27,7 @@ object SettingsResourcePatch : ResourcePatch() {
     val isHd get() = packageName == "tv.danmaku.bilibilihd"
 
     private val xmls = arrayOf(
+        "biliroaming_update_paths.xml",
         "biliroaming_locales_config.xml",
         "biliroaming_search_result.xml",
         "biliroaming_settings.xml",
@@ -111,7 +112,19 @@ object SettingsResourcePatch : ResourcePatch() {
         context.document["res/xml/main_preferences.xml"].use {
             it.addBiliRoamingEntrance()
         }
-        packageName = context.document["AndroidManifest.xml"].use { it["manifest"]["package"] }
+        context.document["AndroidManifest.xml"].use { document ->
+            packageName = document["manifest"]["package"]
+            document["application"].appendChild("provider") {
+                this["android:name"] = "androidx.core.content.FileProvider"
+                this["android:authorities"] = "$packageName.brx.update"
+                this["android:exported"] = "false"
+                this["android:grantUriPermissions"] = "true"
+                appendChild("meta-data") {
+                    this["android:name"] = "android.support.FILE_PROVIDER_PATHS"
+                    this["android:resource"] = "@xml/biliroaming_update_paths"
+                }
+            }
+        }
     }
 
     private fun Document.addBiliRoamingEntrance() {

@@ -37,6 +37,7 @@ jobs:
 
       - name: Build with gradle
         run: |
+          python3 -m pip install -r scripts/update-requirements.txt
           python3 scripts/release.py tools
           python3 -m unittest discover -s scripts/tests -v
           ./gradlew --no-daemon -Dorg.gradle.jvmargs=-Xmx2g dist

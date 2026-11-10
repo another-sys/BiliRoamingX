@@ -1,0 +1,24 @@
+name: Verify OSS update hosting
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r scripts/update-requirements.txt
+      - uses: aliyun/configure-aliyun-credentials-action@1e5248c8d5d93a8781ac344a68e19a43341e79e6 # v1
+        with:
+          role-to-assume: acs:ram::1815570877605552:role/biliroamingx-release
+          oidc-provider-arn: acs:ram::1815570877605552:oidc-provider/github-biliroamingx
+          audience: sts.aliyuncs.com
+          role-session-name: brx-check-${{ github.run_id }}
+      - run: python scripts/publish_oss.py --probe

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a verified, signed Bilibili APK. Python standard library only."""
+"""Build a verified, signed Bilibili APK and its signed update manifest."""
 import argparse
 from contextlib import nullcontext
 import hashlib
@@ -211,6 +211,16 @@ def sign(config):
                 "validation": {"patches": "passed", "protobuf_dispatch": "passed", "integration_hierarchy": "passed", "signature_v1_v2_v3": "passed",
                                "zipalign_16k": "passed", "device_runtime": "not tested by this job"}}
     (DIST / "build-info.json").write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+    from update_protocol import encode
+    release_code = int(subprocess.check_output(["git", "log", "-1", "--format=%ct"], cwd=ROOT, text=True).strip())
+    update = {"schema": 1, "package": config["client"]["package"], "abi": "arm64-v8a", "min_sdk": 24,
+              "release": tag, "release_code": release_code, "version_code": int(config["client"]["version_code"]),
+              "url": f"http://cdn.ianother.cn/biliroamingx/releases/{tag}/{name}",
+              "size": (DIST / name).stat().st_size, "sha256": metadata["apk_sha256"],
+              "source_commit": commit,
+              "notes": (ROOT / "docs/update-notes.txt").read_text(encoding="utf-8").strip()}
+    (DIST / "update.json").write_bytes(encode(update, Path(os.environ["APK_KEYSTORE_PATH"]).read_bytes(),
+                                              os.environ["APK_KEYSTORE_PASSWORD"], signer))
     (DIST / "SHA256SUMS.txt").write_text(
         "".join(f"{sha256(p)}  {p.name}\n" for p in sorted(DIST.iterdir()) if p.is_file()), encoding="utf-8")
     limitations = ", ".join(config["excluded_patches"])

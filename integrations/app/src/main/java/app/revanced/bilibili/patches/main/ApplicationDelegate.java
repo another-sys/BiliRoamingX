@@ -56,6 +56,7 @@ import app.revanced.bilibili.patches.DpiPatch;
 import app.revanced.bilibili.patches.okhttp.BangumiSeasonHook;
 import app.revanced.bilibili.settings.ReleaseCompatibility;
 import app.revanced.bilibili.settings.Settings;
+import app.revanced.bilibili.update.AppUpdater;
 import app.revanced.bilibili.utils.CrossProcessPreferences;
 import app.revanced.bilibili.utils.KtUtils;
 import app.revanced.bilibili.utils.Logger;
@@ -444,6 +445,7 @@ public abstract class ApplicationDelegate extends Application {
         @Override
         public void onActivityResumed(@NonNull Activity activity) {
             printLifecycle(activity, "onActivityResumed", false);
+            AppUpdater.onActivityResumed(activity);
             if (activity instanceof MainActivityV2)
                 VideoInfoHolder.clearCache();
             else if (activity instanceof MediaViewerActivity) {

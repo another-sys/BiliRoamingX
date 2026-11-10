@@ -7,6 +7,7 @@ import android.os.Bundle
 import androidx.annotation.Keep
 import androidx.preference.Preference
 import app.revanced.bilibili.integrations.BuildConfig
+import app.revanced.bilibili.update.AppUpdater
 import app.revanced.bilibili.settings.Setting
 import app.revanced.bilibili.settings.search.annotation.SettingFragment
 import app.revanced.bilibili.utils.*
@@ -114,7 +115,6 @@ class AboutFragment : BiliRoamingBaseSettingFragment() {
     }
 
     private fun onVersionClick() {
-        startActivity(Intent(Intent.ACTION_VIEW,
-            Uri.parse("https://github.com/another-sys/BiliRoamingX/releases")))
+        activity?.let { AppUpdater.check(it, true) }
     }
 }

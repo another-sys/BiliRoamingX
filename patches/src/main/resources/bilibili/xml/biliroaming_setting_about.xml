@@ -5,6 +5,10 @@
         <androidx.preference.Preference
             android:key="version"
             android:title="@string/biliroaming_version_title" />
+        <androidx.preference.SwitchPreferenceCompat
+            android:key="fork_auto_update"
+            android:title="自动检查更新"
+            android:summary="每天在首页后台检查一次，下载和安装前会提示确认" />
         <androidx.preference.Preference
             android:key="feedback"
             android:summary="@string/biliroaming_feedback_summary"

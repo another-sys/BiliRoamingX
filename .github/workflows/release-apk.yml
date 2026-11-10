@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: apk-${{ github.ref }}
+  group: biliroamingx-apk-release
   cancel-in-progress: false
 
 jobs:
@@ -18,6 +18,7 @@ jobs:
     timeout-minutes: 45
     permissions:
       contents: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -39,6 +40,7 @@ jobs:
         run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'ndk;26.3.11579264' 'cmake;3.22.1'
       - name: Check release guards and download verified tools
         run: |
+          python -m pip install -r scripts/update-requirements.txt
           python -m unittest discover -s scripts/tests -v
           python scripts/release.py tools
           python scripts/release.py source
@@ -75,6 +77,17 @@ jobs:
         run: |
           gh release create "$RELEASE_TAG" dist/* --verify-tag \
             --prerelease --title "BiliRoamingX / $RELEASE_TAG" --notes-file release-work/release-notes.md
+      - name: Obtain scoped OSS publishing credentials
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: aliyun/configure-aliyun-credentials-action@1e5248c8d5d93a8781ac344a68e19a43341e79e6 # v1
+        with:
+          role-to-assume: acs:ram::1815570877605552:role/biliroamingx-release
+          oidc-provider-arn: acs:ram::1815570877605552:oidc-provider/github-biliroamingx
+          audience: sts.aliyuncs.com
+          role-session-name: brx-release-${{ github.run_id }}
+      - name: Publish and verify domestic updates
+        if: startsWith(github.ref, 'refs/tags/')
+        run: python scripts/publish_oss.py
       - name: Upload diagnostics on failure
         if: failure()
         uses: actions/upload-artifact@v4

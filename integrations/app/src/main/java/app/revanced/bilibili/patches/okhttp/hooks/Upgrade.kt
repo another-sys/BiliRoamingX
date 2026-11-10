@@ -40,11 +40,13 @@ object Upgrade : ApiHook() {
     }
 
     override fun shouldHook(url: String, status: Int): Boolean {
-        return (Settings.BlockUpdate() || customUpdate(fromSelf = fromSelf))
+        return ((Utils.isPink() && Versions.ge9_17_0()) || Settings.BlockUpdate() || customUpdate(fromSelf = fromSelf))
                 && url.contains("/x/v2/version/fawkes/upgrade")
     }
 
     override fun hook(url: String, status: Int, request: String, response: String): String {
+        if (Utils.isPink() && Versions.ge9_17_0())
+            return """{"code":-1,"message":"请在哔哩漫游 X → 关于 → 检查更新中获取集成包"}"""
         return if (customUpdate(fromSelf = fromSelf))
             (runCatchingOrNull { checkUpgrade().toString() }
                 ?: """{"code":-1,"message":"检查更新失败，请稍后再试/(ㄒoㄒ)/~~""")

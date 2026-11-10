@@ -21,6 +21,12 @@ setupAppModule {
         versionCode = verName.split('.').let { (m, s, f) ->
             m.toInt() * 1000000 + s.toInt() * 1000 + f.toInt()
         }
+        // Commit time also identifies module-only releases of the same client version.
+        val updateCode = providers.exec {
+            commandLine("git", "log", "-1", "--format=%ct")
+        }.standardOutput.asText.get().trim().toLong()
+        buildConfigField("long", "UPDATE_BUILD_CODE", "${updateCode}L")
+        buildConfigField("String", "UPDATE_URL", "\"http://cdn.ianother.cn/biliroamingx/update.json\"")
 
         externalNativeBuild {
             cmake {
