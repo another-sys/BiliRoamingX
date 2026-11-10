@@ -21,9 +21,11 @@ object RemoveVipSectionPatch {
         view ?: return
         val mineRecycle = view.findView<View?>("mine_recycle") as? ViewGroup
         mineRecycle?.clipToPadding = false
-        // Newer Mine layouts can omit this legacy VIP container entirely.
-        // Their promotion cards are filtered separately by CommercialNavigation.
-        val vipLayout = view.findView<View?>("mine_vip_layout") as? ViewGroup ?: return
+        // Mine has legacy, refactored View and Compose layouts. Compose is
+        // filtered separately; either View container can be absent here.
+        val vipLayout = (view.findView<View?>("mine_vip_layout") as? ViewGroup)
+            ?: (view.findView<View?>("mine_vip_layout_refactoring") as? ViewGroup)
+            ?: return
         if (Settings.RemoveVipSection()) {
             vipLayout.children.forEach { it.hide() }
             val currentThemeId = currentThemeId()
