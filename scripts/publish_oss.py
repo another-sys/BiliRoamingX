@@ -23,6 +23,7 @@ def bucket():
 
 
 def public_hash(url):
+    print('Checking public download ' + url, flush=True)
     digest = hashlib.sha256()
     with urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': 'BiliRoamingX-release'}), timeout=60) as response:
         if not response.url.startswith(BASE):
@@ -46,6 +47,7 @@ def publish(directory, client):
         raise ValueError('Local APK differs from signed manifest')
     current_key = PREFIX + 'update.json'
     try:
+        print('Reading current OSS update manifest', flush=True)
         old_bytes = client.get_object(current_key).read()
         old = decode(old_bytes)
     except oss2.exceptions.NoSuchKey:
@@ -60,6 +62,7 @@ def publish(directory, client):
                    'x-oss-forbid-overwrite': 'true', 'x-oss-meta-sha256': public_file_hash(path),
                    'Content-Type': 'application/vnd.android.package-archive' if path.suffix == '.apk' else 'application/octet-stream'}
         try:
+            print('Uploading ' + key, flush=True)
             client.put_object_from_file(key, str(path), headers=headers)
         except oss2.exceptions.ServerError as error:
             if error.status != 409 or client.head_object(key).headers.get('x-oss-meta-sha256') != headers['x-oss-meta-sha256']:
@@ -91,12 +94,15 @@ def probe(client):
     key = PREFIX + 'checks/' + os.environ.get('GITHUB_RUN_ID', str(time.time_ns())) + '.txt'
     data = b'BiliRoamingX OSS publishing check\n'
     headers = {'x-oss-object-acl': 'public-read', 'Cache-Control': 'no-store, no-cache, max-age=0, must-revalidate'}
+    print('Probe: upload ' + key, flush=True)
     client.put_object(key, data, headers=headers)
+    print('Probe: authenticated OSS read', flush=True)
     if client.get_object(key).read() != data or public_hash(BASE + key) != hashlib.sha256(data).hexdigest():
         raise ValueError('OSS/CDN round trip failed')
     # Fetch the exact same URL after an overwrite: query-string cache busting is
     # deliberately absent so a stale CDN rule cannot hide behind a new cache key.
     replacement = data + b'Freshness verified\n'
+    print('Probe: replace no-cache object', flush=True)
     client.put_object(key, replacement, headers=headers)
     if public_hash(BASE + key) != hashlib.sha256(replacement).hexdigest():
         raise ValueError('CDN cached an outdated no-cache object')
