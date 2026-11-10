@@ -50,7 +50,7 @@ object BLRoutePatch : BytecodePatch(setOf(BLRouteBuilderFingerprint, RouteReques
             move-result-object p1
         """.trimIndent()
         ) ?: throw RouteRequestFingerprint.exception
-        VideoDetailPreloadFingerprint.result?.run {
+        (VideoDetailPreloadFingerprint.result ?: throw VideoDetailPreloadFingerprint.exception).run {
             val index = scanResult.stringsScanResult!!.matches.first { it.string == "player_preload" }.index + 1
             val call = mutableMethod.implementation!!.instructions[index]
             if (call is FiveRegisterInstruction && (call as? ReferenceInstruction)?.reference.toString() ==
@@ -58,7 +58,7 @@ object BLRoutePatch : BytecodePatch(setOf(BLRouteBuilderFingerprint, RouteReques
                 mutableMethod.replaceInstruction(index,
                     "invoke-static {v${call.registerC}, v${call.registerD}}, " +
                             "Lapp/revanced/bilibili/patches/BLRoutePatch;->videoDetailPreload(Landroid/os/Bundle;Ljava/lang/String;)Ljava/lang/String;")
-            }
+            } else throw VideoDetailPreloadFingerprint.exception
         }
         val routeToMethod = context.classes.asSequence().flatMap { it.methods }.first { m ->
             m.accessFlags.let { it.isStatic() && it.isPublic() }

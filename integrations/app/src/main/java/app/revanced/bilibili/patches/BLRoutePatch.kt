@@ -21,9 +21,11 @@ object BLRoutePatch {
     @JvmStatic
     fun videoDetailPreload(args: Bundle, key: String): String? {
         val preload = args.getString(key) ?: return null
-        // The 9.17 history and home preload can start the video without resolving its danmaku.
+        // These 9.17 entry points can start the video from a preload without resolving danmaku.
+        // Both legacy and Compose search-result cards use the same source identifier.
         return when (args.getString("from_spmid")) {
-            "main.my-history.0.0", "tm.recommend.0.0" -> if (Versions.ge9_17_0()) null else preload
+            "main.my-history.0.0", "tm.recommend.0.0", "search.search-result.0.0" ->
+                if (Versions.ge9_17_0()) null else preload
             else -> preload
         }
     }
