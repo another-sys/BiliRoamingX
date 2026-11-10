@@ -45,6 +45,16 @@ public class VerifyIntegrationHierarchy {
             }
         }
         if (checked == 0) throw new IllegalStateException("No integration classes found");
+        var updateProvider = classes.get("Lapp/revanced/bilibili/update/UpdateFileProvider;");
+        if (updateProvider == null || !"Landroidx/core/content/FileProvider;".equals(updateProvider.getSuperclass())) {
+            throw new IllegalStateException("Missing dedicated update FileProvider");
+        }
+        boolean providerConstructor = false;
+        for (var method : updateProvider.getDirectMethods()) {
+            if (method.getName().equals("<init>") && method.getParameterTypes().isEmpty()
+                    && AccessFlags.PUBLIC.isSet(method.getAccessFlags())) providerConstructor = true;
+        }
+        if (!providerConstructor) throw new IllegalStateException("Update provider cannot be instantiated by Android");
         if (errors != 0) throw new IllegalStateException(errors + " invalid integration inheritance relationships");
         System.out.println("Integration hierarchy verified: " + checked + " classes");
     }

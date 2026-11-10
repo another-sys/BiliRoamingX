@@ -8,7 +8,9 @@
 
 前往 [本仓库 Releases](https://github.com/another-sys/BiliRoamingX/releases)，下载 `Bilibili-9.17.0-BiliRoamingX-…-arm64.apk`。这是已经合并模块的完整客户端，无需 Root、LSPosed 或单独安装模块 APK。
 
-从 rc.7 开始提供应用内更新：首次手动覆盖安装后，新版本会提示下载并由系统确认安装。可在「哔哩漫游 X → 关于 → 检查更新」手动检查。更新文件通过 `cdn.ianother.cn` 国内 CDN 分发，使用签名清单和 APK 校验；模块随完整客户端一起更新，详见 [国内更新说明](docs/updates.md)。
+国内用户可直接下载 [rc.8 完整安装包](http://cdn.ianother.cn/biliroamingx/releases/v1.24.0-bili9.17.0-rc.8/Bilibili-9.17.0-BiliRoamingX-v1.24.0-bili9.17.0-rc.8-arm64.apk)，安装后支持应用内更新。
+
+从 rc.8 开始提供应用内更新：首次手动覆盖安装后，新版本会提示下载并由系统确认安装。可在「哔哩漫游 X → 关于 → 检查更新」手动检查。更新文件通过 `cdn.ianother.cn` 国内 CDN 分发，使用签名清单和 APK 校验；模块随完整客户端一起更新，详见 [国内更新说明](docs/updates.md)。rc.7 的小米安装器兼容问题在 rc.8 修复，rc.7 用户需手动覆盖安装本版。
 
 从 rc.4 开始，默认过滤开屏广告、首页推广卡片、视频详情和暂停广告，隐藏会员购、游戏中心等商业入口。覆盖旧版时会应用一次这些设置，保留其他筛选和登录数据。之后可在「哔哩漫游 X」相应页面单独改回。
 
@@ -23,7 +25,7 @@
 仓库已提供 [Build installable Bilibili APK](.github/workflows/release-apk.yml)。推送 `v*` tag 会从该提交构建模块与补丁、验证官方 APK、合并、签名，创建带 APK 的 GitHub 预发布，并在国内下载校验通过后发布更新清单。
 
 ```sh
-tag=v1.24.0-bili9.17.0-rc.8  # 示例，请换成尚未使用的新版本号
+tag=v1.24.0-bili9.17.0-rc.9  # 示例，请换成尚未使用的新版本号
 git tag "$tag"
 git push origin "$tag"
 ```

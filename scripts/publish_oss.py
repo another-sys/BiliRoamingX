@@ -69,11 +69,14 @@ def publish(directory, client):
         headers = {'Cache-Control': 'public,max-age=31536000,immutable', 'x-oss-object-acl': 'public-read',
                    'x-oss-forbid-overwrite': 'true', 'x-oss-meta-sha256': public_file_hash(path),
                    'Content-Type': 'application/vnd.android.package-archive' if path.suffix == '.apk' else 'application/octet-stream'}
+        if existing_matches(client, key, headers['x-oss-meta-sha256'], path.stat().st_size):
+            print('Verified existing ' + key, flush=True)
+            continue
         try:
             print('Uploading ' + key, flush=True)
             client.put_object_from_file(key, str(path), headers=headers)
         except oss2.exceptions.ServerError as error:
-            if error.status != 409 or client.head_object(key).headers.get('x-oss-meta-sha256') != headers['x-oss-meta-sha256']:
+            if error.status != 409 or not existing_matches(client, key, headers['x-oss-meta-sha256'], path.stat().st_size):
                 raise
         print('Uploaded ' + key, flush=True)
     if public_hash(update['url']) != update['sha256']:
@@ -96,6 +99,16 @@ def publish(directory, client):
 def public_file_hash(path):
     with path.open('rb') as stream:
         return hashlib.file_digest(stream, 'sha256').hexdigest()
+
+
+def existing_matches(client, key, sha256, size):
+    try:
+        stored = client.head_object(key)
+    except oss2.exceptions.NoSuchKey:
+        return False
+    if stored.headers.get('x-oss-meta-sha256') != sha256 or stored.content_length != size:
+        raise ValueError('Refusing to replace different immutable object: ' + key)
+    return True
 
 
 def probe(client):

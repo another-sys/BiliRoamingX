@@ -115,7 +115,7 @@ object SettingsResourcePatch : ResourcePatch() {
         context.document["AndroidManifest.xml"].use { document ->
             packageName = document["manifest"]["package"]
             document["application"].appendChild("provider") {
-                this["android:name"] = "androidx.core.content.FileProvider"
+                this["android:name"] = "app.revanced.bilibili.update.UpdateFileProvider"
                 this["android:authorities"] = "$packageName.brx.update"
                 this["android:exported"] = "false"
                 this["android:grantUriPermissions"] = "true"

@@ -26,6 +26,7 @@ class UpdatePublication(unittest.TestCase):
         (self.directory / 'build-info.json').write_text(json.dumps(dict(
             apk='client.apk', source_dirty=False, source_commit='abc')), encoding='utf-8')
         self.client = Mock()
+        self.client.head_object.side_effect = publisher.oss2.exceptions.NoSuchKey(404, {}, '', {})
         self.client.get_object.return_value.read.return_value = b'previous envelope'
         decoder = patch.object(publisher, 'decode', side_effect=lambda value:
                                self.update if value == self.envelope else self.current)
@@ -68,6 +69,24 @@ class UpdatePublication(unittest.TestCase):
             self.publish([])
         (self.directory / 'client.apk').write_bytes(self.apk)
         self.current['release_code'] = 101
+        with self.assertRaises(ValueError):
+            self.publish([])
+        self.client.put_object_from_file.assert_not_called()
+        self.client.put_object.assert_not_called()
+
+    def test_matching_existing_files_skip_upload(self):
+        def head(key):
+            path = self.directory / key.rsplit('/', 1)[1]
+            return Mock(headers={'x-oss-meta-sha256': publisher.public_file_hash(path)},
+                        content_length=path.stat().st_size)
+        self.client.head_object.side_effect = head
+        self.publish([self.update['sha256']] + [hashlib.sha256(self.envelope).hexdigest()] * 2)
+        self.client.put_object_from_file.assert_not_called()
+        self.client.put_object.assert_called_once()
+
+    def test_conflicting_immutable_object_never_overwritten(self):
+        self.client.head_object.side_effect = None
+        self.client.head_object.return_value = Mock(headers={'x-oss-meta-sha256': 'bad'}, content_length=1)
         with self.assertRaises(ValueError):
             self.publish([])
         self.client.put_object_from_file.assert_not_called()
